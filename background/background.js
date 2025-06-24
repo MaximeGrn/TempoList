@@ -45,16 +45,18 @@ async function resetDay() {
         const today = new Date().toDateString();
         
         // Sauvegarder dans l'historique avant de réinitialiser
-        const currentDay = await chrome.storage.local.get('currentDay');
-        if (currentDay.currentDay && currentDay.currentDay.count > 0) {
-            const history = await chrome.storage.local.get('history');
-            const historyData = history.history || [];
+        const { currentDay: dayData, dailyTarget } = await chrome.storage.local.get(['currentDay', 'dailyTarget']);
+        
+        if (dayData && dayData.count > 0) {
+            const { history } = await chrome.storage.local.get('history');
+            const historyData = history || [];
             
             historyData.push({
-                date: currentDay.currentDay.date,
-                count: currentDay.currentDay.count,
-                timestamps: currentDay.currentDay.timestamps,
-                activeTeam: currentDay.currentDay.activeTeam
+                date: dayData.date,
+                count: dayData.count,
+                timestamps: dayData.timestamps,
+                activeTeam: dayData.activeTeam,
+                dailyTarget: dailyTarget || 0 // Sauvegarder l'objectif du jour
             });
             
             await chrome.storage.local.set({ history: historyData });

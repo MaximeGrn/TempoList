@@ -52,7 +52,7 @@ header h1 {
 
 .main-counter {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .progress-circle {
@@ -67,6 +67,7 @@ header h1 {
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
+    margin-top: 2px;
 }
 
 .progress-text span {
@@ -83,52 +84,45 @@ header h1 {
 
 .counter-buttons {
     display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 25px;
+    margin-bottom: 25px;
     justify-content: center;
 }
 
-.counter-btn {
+.checkbox-wrapper {
+    cursor: pointer;
+    transition: transform 0.2s ease-out;
+}
+
+.checkbox-wrapper:hover {
+    transform: scale(1.1);
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+}
+
+.checkbox-display-red,
+.checkbox-display-green {
     width: 60px;
     height: 60px;
-    border: none;
-    border-radius: 50%;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.increment-btn {
-    background: #27ae60;
-    color: white;
+.checkbox-display-red {
+    background: linear-gradient(135deg, #ff6347, #f76c6c);
 }
 
-.increment-btn:hover {
-    background: #219a52;
-    transform: scale(1.05);
+.checkbox-display-green {
+    background: linear-gradient(135deg, #36b54a, #00c1d4);
 }
 
-.decrement-btn {
-    background: #e74c3c;
-    color: white;
-}
-
-.decrement-btn:hover {
-    background: #c0392b;
-    transform: scale(1.05);
-}
-
-.decrement-btn:disabled {
-    background: #bdc3c7;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.counter-btn:active {
+.checkbox-wrapper:active {
     transform: scale(0.95);
 }
 

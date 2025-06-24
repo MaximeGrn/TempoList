@@ -137,11 +137,33 @@ function createHistoryRow(day, index) {
     const avgTime = day.timestamps.length > 1 
         ? formatTime(calculateDayAverageTime(day))
         : '--';
+
+    const dailyTarget = day.dailyTarget || 0;
+    const objectiveText = dailyTarget > 0 ? dailyTarget : '--';
+    
+    let statusText;
+    if (dailyTarget > 0) {
+        if (day.count >= dailyTarget) {
+            statusText = `<span class="status-badge status-success">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14m3.04-9.96a.75.75 0 0 0-1.08-1.04l-3.25 3.5-1.5-1.5a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0z" clip-rule="evenodd" /></svg>
+                            Atteint
+                          </span>`;
+        } else {
+            statusText = `<span class="status-badge status-failure">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14m-1.03-9.97a.75.75 0 0 1 1.06-1.06L8 5.94l1.97-1.97a.75.75 0 1 1 1.06 1.06L9.06 7l1.97 1.97a.75.75 0 1 1-1.06 1.06L8 8.06l-1.97 1.97a.75.75 0 1 1-1.06-1.06L6.94 7l-1.97-1.97z" clip-rule="evenodd" /></svg>
+                            Non atteint
+                          </span>`;
+        }
+    } else {
+        statusText = '--';
+    }
     
     row.innerHTML = `
         <td>${date}</td>
         <td>${teamName ? `<span class="team-badge">${teamName}</span>` : '--'}</td>
         <td><strong>${day.count}</strong></td>
+        <td>${objectiveText}</td>
+        <td>${statusText}</td>
         <td>${duration}</td>
         <td>${avgTime}</td>
         <td>
