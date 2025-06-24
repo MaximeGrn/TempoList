@@ -204,6 +204,10 @@ header h1 {
     background: #e74c3c;
 }
 
+.status-dot.started {
+    background: #3498db;
+}
+
 .actions {
     display: flex;
     gap: 8px;

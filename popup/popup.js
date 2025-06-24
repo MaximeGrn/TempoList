@@ -240,7 +240,14 @@ function updateStatus() {
     const statusColor = document.getElementById('statusColor');
     
     // Retirer les classes existantes
-    statusColor.classList.remove('ahead', 'ontime', 'behind');
+    statusColor.classList.remove('ahead', 'ontime', 'behind', 'started');
+    
+    // Si on a au moins une liste, on affiche "Commencé"
+    if (currentData.currentDay.count > 0 && status === 'neutral') {
+        statusText.textContent = 'Commencé';
+        statusColor.classList.add('started');
+        return;
+    }
     
     switch (status) {
         case 'ahead':
@@ -340,7 +347,8 @@ async function resetDay() {
                 date: currentData.currentDay.date,
                 count: currentData.currentDay.count,
                 timestamps: currentData.currentDay.timestamps,
-                activeTeam: currentData.currentDay.activeTeam
+                activeTeam: currentData.currentDay.activeTeam,
+                dailyTarget: currentData.dailyTarget || 0 // Inclure l'objectif quotidien
             });
             
             await chrome.storage.local.set({ history: historyData });
