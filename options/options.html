@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempoList - Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Configuration TempoList</h1>
+        </header>
+
+        <div class="section">
+            <h2>🎯 Objectif journalier</h2>
+            <div class="input-group">
+                <label for="dailyTarget">Nombre de listes à remplir par jour :</label>
+                <input type="number" id="dailyTarget" min="1" max="200" value="40">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>👥 Gestion des équipes</h2>
+            
+            <div class="team-form">
+                <div class="input-group">
+                    <label for="teamName">Nom de l'équipe :</label>
+                    <input type="text" id="teamName" placeholder="Ex: Équipe A">
+                </div>
+                
+                <div class="schedules-container">
+                    <h3>Horaires de travail</h3>
+                    <div id="schedulesList">
+                        <!-- Les horaires seront ajoutés dynamiquement -->
+                    </div>
+                    <button type="button" id="addScheduleBtn" class="secondary-btn">
+                        ➕ Ajouter un créneau
+                    </button>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" id="saveTeamBtn" class="primary-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-floppy2-fill" viewBox="0 0 16 16">
+                          <path d="M12 2h-2v3h2z"/>
+                          <path d="M1.5 0A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5V2.914a1.5 1.5 0 0 0-.44-1.06L14.147.439A1.5 1.5 0 0 0 13.086 0zM4 6a1 1 0 0 1-1-1V1h10v4a1 1 0 0 1-1 1zM3 9h10a1 1 0 0 1 1 1v5H2v-5a1 1 0 0 1 1-1"/>
+                        </svg>
+                        Sauvegarder l'équipe
+                    </button>
+                    <button type="button" id="cancelEditBtn" class="secondary-btn" style="display: none;">
+                        ❌ Annuler
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Équipes existantes</h2>
+            <div id="teamsList">
+                <p class="no-teams">Aucune équipe configurée</p>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button type="button" id="saveSettingsBtn" class="primary-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-floppy2-fill" viewBox="0 0 16 16">
+                  <path d="M12 2h-2v3h2z"/>
+                  <path d="M1.5 0A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5V2.914a1.5 1.5 0 0 0-.44-1.06L14.147.439A1.5 1.5 0 0 0 13.086 0zM4 6a1 1 0 0 1-1-1V1h10v4a1 1 0 0 1-1 1zM3 9h10a1 1 0 0 1 1 1v5H2v-5a1 1 0 0 1 1-1"/>
+                </svg>
+                Sauvegarder les paramètres
+            </button>
+            <button type="button" id="backToPopupBtn" class="secondary-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left-circle" viewBox="0 0 16 16">
+                  <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8m15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-4.5-.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5z"/>
+                </svg>
+                Retour au popup
+            </button>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <!-- Template pour les créneaux horaires -->
+    <template id="scheduleTemplate">
+        <div class="schedule-item">
+            <div class="time-inputs">
+                <input type="time" class="start-time" placeholder="Début">
+                <span>à</span>
+                <input type="time" class="end-time" placeholder="Fin">
+                <button type="button" class="remove-schedule-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
+                      <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template pour l'affichage des équipes -->
+    <template id="teamDisplayTemplate">
+        <div class="team-card">
+            <div class="team-header">
+                <h3 class="team-name"></h3>
+                <div class="team-actions">
+                    <button type="button" class="edit-team-btn secondary-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                          <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                          <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="delete-team-btn danger-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
+                          <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="team-schedules">
+                <!-- Les horaires seront affichés ici -->
+            </div>
+        </div>
+    </template>
+
+    <script src="options.js"></script>
+</body>
+</html> 

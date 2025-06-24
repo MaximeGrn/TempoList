@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "TempoList",
+  "version": "1.0",
+  "description": "Extension pour suivre l'avancement du remplissage de listes de fournitures scolaires",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "TempoList"
+  },
+  "options_page": "options/options.html",
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "icons": {
+    "128": "assets/icon128.png"
+  }
+} 

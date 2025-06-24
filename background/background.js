@@ -1,0 +1,122 @@
+// Service Worker pour TempoList
+// Gestionnaire d'installation
+chrome.runtime.onInstalled.addListener(async () => {
+    console.log('TempoList installé');
+    
+    // Initialiser les données par défaut si elles n'existent pas
+    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'currentDay']);
+    
+    if (!result.teams) {
+        await chrome.storage.local.set({ teams: [] });
+    }
+    
+    if (!result.dailyTarget) {
+        await chrome.storage.local.set({ dailyTarget: 40 });
+    }
+    
+    if (!result.currentDay) {
+        await chrome.storage.local.set({ 
+            currentDay: {
+                date: new Date().toDateString(),
+                count: 0,
+                timestamps: [],
+                activeTeam: null
+            }
+        });
+    }
+});
+
+// Gestionnaire pour les messages entre les différentes parties de l'extension
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'resetDay') {
+        resetDay().then(sendResponse);
+        return true; // Pour indiquer une réponse asynchrone
+    }
+    
+    if (request.action === 'addListCompleted') {
+        addListCompleted().then(sendResponse);
+        return true;
+    }
+});
+
+// Fonction pour réinitialiser la journée
+async function resetDay() {
+    try {
+        const today = new Date().toDateString();
+        
+        // Sauvegarder dans l'historique avant de réinitialiser
+        const currentDay = await chrome.storage.local.get('currentDay');
+        if (currentDay.currentDay && currentDay.currentDay.count > 0) {
+            const history = await chrome.storage.local.get('history');
+            const historyData = history.history || [];
+            
+            historyData.push({
+                date: currentDay.currentDay.date,
+                count: currentDay.currentDay.count,
+                timestamps: currentDay.currentDay.timestamps,
+                activeTeam: currentDay.currentDay.activeTeam
+            });
+            
+            await chrome.storage.local.set({ history: historyData });
+        }
+        
+        // Réinitialiser la journée actuelle
+        await chrome.storage.local.set({
+            currentDay: {
+                date: today,
+                count: 0,
+                timestamps: [],
+                activeTeam: null
+            }
+        });
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Erreur lors de la réinitialisation:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Fonction pour ajouter une liste complétée
+async function addListCompleted() {
+    try {
+        const currentDay = await chrome.storage.local.get('currentDay');
+        const dayData = currentDay.currentDay;
+        
+        if (!dayData) {
+            throw new Error('Données du jour non trouvées');
+        }
+        
+        const now = Date.now();
+        dayData.count += 1;
+        dayData.timestamps.push(now);
+        
+        await chrome.storage.local.set({ currentDay: dayData });
+        
+        return { success: true, newCount: dayData.count };
+    } catch (error) {
+        console.error('Erreur lors de l\'ajout:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Vérifier quotidiennement si on doit créer une nouvelle journée
+// (au cas où l'utilisateur n'utilise pas l'extension pendant plusieurs jours)
+function checkNewDay() {
+    chrome.storage.local.get('currentDay', (result) => {
+        const today = new Date().toDateString();
+        const currentDay = result.currentDay;
+        
+        if (currentDay && currentDay.date !== today) {
+            // Nouveau jour détecté, mais on ne réinitialise PAS automatiquement
+            // L'utilisateur doit le faire manuellement
+            console.log('Nouveau jour détecté, mais pas de réinitialisation automatique');
+        }
+    });
+}
+
+// Vérifier au démarrage
+checkNewDay();
+
+// Optionnel : vérifier périodiquement (toutes les heures)
+setInterval(checkNewDay, 60 * 60 * 1000); 

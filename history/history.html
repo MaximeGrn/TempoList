@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempoList - Historique</title>
+    <link rel="stylesheet" href="history.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Historique TempoList</h1>
+            <button id="backBtn" class="secondary-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left-circle" viewBox="0 0 16 16">
+                  <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8m15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-4.5-.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5z"/>
+                </svg>
+                Retour
+            </button>
+        </header>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="filterTeam">Filtrer par équipe :</label>
+                <select id="filterTeam">
+                    <option value="">Toutes les équipes</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterPeriod">Période :</label>
+                <select id="filterPeriod">
+                    <option value="all">Tous</option>
+                    <option value="week">7 derniers jours</option>
+                    <option value="month">30 derniers jours</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="stats-summary">
+            <div class="stat-card">
+                <h3>Total des listes</h3>
+                <span id="totalLists">0</span>
+            </div>
+            <div class="stat-card">
+                <h3>Moyenne par jour</h3>
+                <span id="avgPerDay">0</span>
+            </div>
+            <div class="stat-card">
+                <h3>Meilleur jour</h3>
+                <span id="bestDay">--</span>
+            </div>
+        </div>
+
+        <div class="history-table-container">
+            <table id="historyTable" class="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Équipe</th>
+                        <th>Listes</th>
+                        <th>Durée</th>
+                        <th>Temps moyen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- Les données seront ajoutées dynamiquement -->
+                </tbody>
+            </table>
+            
+            <div id="noHistoryMessage" class="no-history" style="display: none;">
+                <p>Aucun historique disponible pour les critères sélectionnés.</p>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- Modal d'édition -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                      <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                      <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                    </svg>
+                    Éditer l'entrée
+                </h2>
+                <button id="closeModal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="editDate">Date :</label>
+                    <input type="date" id="editDate">
+                </div>
+                <div class="input-group">
+                    <label for="editCount">Nombre de listes :</label>
+                    <input type="number" id="editCount" min="0" max="500">
+                </div>
+                <div class="input-group">
+                    <label for="editTeam">Équipe :</label>
+                    <select id="editTeam">
+                        <option value="">Aucune équipe</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveEditBtn" class="primary-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-floppy2-fill" viewBox="0 0 16 16">
+                      <path d="M12 2h-2v3h2z"/>
+                      <path d="M1.5 0A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5V2.914a1.5 1.5 0 0 0-.44-1.06L14.147.439A1.5 1.5 0 0 0 13.086 0zM4 6a1 1 0 0 1-1-1V1h10v4a1 1 0 0 1-1 1zM3 9h10a1 1 0 0 1 1 1v5H2v-5a1 1 0 0 1 1-1"/>
+                    </svg>
+                    Sauvegarder
+                </button>
+                <button id="cancelEditBtn" class="secondary-btn">❌ Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay"></div>
+
+    <script src="history.js"></script>
+</body>
+</html> 
