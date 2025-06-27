@@ -37,6 +37,12 @@ function createContextMenu() {
             title: "🔄 Auto-remplir Commune",
             contexts: ["all"]
         });
+        
+        chrome.contextMenus.create({
+            id: "autoFillPattern",
+            title: "🎯 Remplissage automatique",
+            contexts: ["all"]
+        });
     });
 }
 
@@ -46,19 +52,26 @@ let currentElementInfo = null;
 // Gestionnaire pour les clics sur le menu contextuel
 chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === "autoFillCommune") {
-        // Démarrer l'automatisation
+        // Démarrer l'automatisation Commune
         if (currentElementInfo) {
             chrome.tabs.sendMessage(tab.id, {
                 action: 'startAutomation',
-                element: currentElementInfo
+                element: currentElementInfo,
+                mode: 'commune'
             });
         } else {
-            // Essayer de démarrer sans élément spécifique
             chrome.tabs.sendMessage(tab.id, {
                 action: 'startAutomation',
-                element: { tagName: 'SELECT' } // Par défaut, chercher un select
+                element: { tagName: 'SELECT' },
+                mode: 'commune'
             });
         }
+    } else if (info.menuItemId === "autoFillPattern") {
+        // Démarrer le remplissage automatique par pattern
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'startPatternFill',
+            element: currentElementInfo || { tagName: 'SELECT' }
+        });
     }
 });
 

@@ -33,7 +33,10 @@ loadConfig();
 // Écouter les messages du background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'startAutomation') {
-        startAutomation(request.element);
+        startAutomation(request.element, request.mode || 'commune');
+        sendResponse({ success: true });
+    } else if (request.action === 'startPatternFill') {
+        startPatternFill(request.element);
         sendResponse({ success: true });
     } else if (request.action === 'stopAutomation') {
         stopAutomation();
@@ -57,8 +60,8 @@ function handleEscapeKey(event) {
 document.addEventListener('keydown', handleEscapeKey);
 
 // Fonction pour démarrer l'automatisation
-function startAutomation(elementInfo) {
-    logAction('🚀 Début de l\'automatisation');
+function startAutomation(elementInfo, mode = 'commune') {
+    logAction(`🚀 Début de l'automatisation (mode: ${mode})`);
     
     if (isAutomationRunning) {
         logAction('⚠️ Arrêt de l\'automatisation précédente');
@@ -81,7 +84,7 @@ function startAutomation(elementInfo) {
     // Identifier la ligne de départ
     currentRowIndex = getRowIndex(currentTargetElement);
     if (currentRowIndex !== -1) {
-        logImportant(`🎯 Démarrage ligne ${currentRowIndex}`, 'success');
+        logImportant(`🎯 Démarrage ligne ${currentRowIndex} (${mode})`, 'success');
     } else {
         logImportant('⚠️ Impossible de déterminer la ligne de départ', 'error');
     }
@@ -919,4 +922,199 @@ window.tempoListDiagnostic = function() {
 // Auto-diagnostic au chargement
 setTimeout(() => {
     window.tempoListDiagnostic();
-}, 3000); 
+}, 3000);
+
+// === REMPLISSAGE AUTOMATIQUE PAR PATTERN ===
+
+// Fonction pour démarrer le remplissage automatique par pattern
+async function startPatternFill(elementInfo) {
+    logAction('🎯 Début du remplissage automatique par pattern');
+    
+    if (isAutomationRunning) {
+        logAction('⚠️ Arrêt de l\'automatisation précédente');
+        stopAutomation();
+    }
+
+    // Créer le panneau de débogage
+    createDebugPanel();
+    
+    try {
+        // Charger la configuration
+        await loadConfig();
+        
+        // Trouver tous les selects de matières dans l'ordre
+        const allSelects = await findAllSubjectSelects();
+        
+        if (allSelects.length === 0) {
+            logImportant('❌ Aucun élément à remplir trouvé', 'error');
+            showNotification('Aucun élément à remplir trouvé', 'error');
+            return;
+        }
+
+        logImportant(`🎯 Démarrage remplissage automatique (${allSelects.length} lignes)`, 'success');
+        
+        isAutomationRunning = true;
+        actionCount = 0;
+        showNotification('Remplissage automatique démarré - Appuyez sur Échap pour arrêter', 'success');
+        
+        // Démarrer le remplissage
+        await executePatternFill(allSelects);
+        
+    } catch (error) {
+        logImportant(`❌ Erreur lors du remplissage: ${error.message}`, 'error');
+        console.error('Erreur lors du remplissage automatique:', error);
+        stopAutomation();
+        showNotification('Erreur lors du remplissage automatique', 'error');
+    }
+}
+
+// Fonction pour trouver tous les selects de matières dans l'ordre
+async function findAllSubjectSelects() {
+    logAction('🔍 Recherche de tous les selects de matières...');
+    
+    // Essayer plusieurs sélecteurs pour trouver les selects de matières
+    let selects = [];
+    
+    // Méthode 1: Par classe spécifique
+    selects = document.querySelectorAll('select.selectSubject');
+    if (selects.length > 0) {
+        logAction(`✅ Trouvé ${selects.length} selects via .selectSubject`);
+        return Array.from(selects);
+    }
+    
+    // Méthode 2: Par attribut col-id
+    selects = document.querySelectorAll('[col-id*="subject"] select, [col-id*="matière"] select, [col-id*="matiere"] select');
+    if (selects.length > 0) {
+        logAction(`✅ Trouvé ${selects.length} selects via col-id`);
+        return Array.from(selects);
+    }
+    
+    // Méthode 3: Tous les selects dans les lignes AG-Grid
+    const agRows = document.querySelectorAll('.ag-row');
+    if (agRows.length > 0) {
+        selects = [];
+        agRows.forEach(row => {
+            const rowSelects = row.querySelectorAll('select');
+            // Prendre le premier select de chaque ligne (supposé être la matière)
+            if (rowSelects.length > 0) {
+                selects.push(rowSelects[0]);
+            }
+        });
+        
+        if (selects.length > 0) {
+            logAction(`✅ Trouvé ${selects.length} selects via AG-Grid`);
+            return selects;
+        }
+    }
+    
+    // Méthode 4: Tous les selects de la page
+    selects = document.querySelectorAll('select');
+    logAction(`⚠️ Fallback: utilisation de tous les selects (${selects.length})`);
+    return Array.from(selects);
+}
+
+// Fonction principale de remplissage par pattern
+async function executePatternFill(allSelects) {
+    logAction(`🎯 Début du remplissage de ${allSelects.length} éléments`);
+    
+    let currentSubject = '';
+    let processedCount = 0;
+    
+    for (let i = 0; i < allSelects.length; i++) {
+        if (!isAutomationRunning) {
+            logAction('🛑 Arrêt demandé par l\'utilisateur');
+            break;
+        }
+        
+        const select = allSelects[i];
+        const rowIndex = getRowIndex(select) || i;
+        
+        // Vérifier si l'élément est toujours dans le DOM
+        if (!document.contains(select)) {
+            logAction(`⚠️ Ligne ${rowIndex}: Élément supprimé du DOM, passage à la suivante`);
+            continue;
+        }
+        
+        // Obtenir la valeur actuelle
+        const currentValue = select.value.trim();
+        const selectedText = select.selectedOptions[0]?.textContent?.trim() || '';
+        
+        logAction(`📝 Ligne ${rowIndex}: Valeur actuelle = "${selectedText || currentValue}"`);
+        
+        // Si on trouve une nouvelle matière non-vide, on la garde comme référence
+        if (currentValue !== '' && selectedText !== '' && selectedText !== currentSubject) {
+            currentSubject = selectedText;
+            logImportant(`📚 Ligne ${rowIndex}: Nouvelle matière détectée: "${currentSubject}"`);
+            processedCount++;
+        }
+        // Si la ligne est vide et qu'on a une matière de référence, on la remplit
+        else if (currentValue === '' && currentSubject !== '') {
+            logAction(`🔄 Ligne ${rowIndex}: Remplissage avec "${currentSubject}"`);
+            
+            try {
+                // Sélectionner la matière
+                await setSubjectValue(select, currentSubject);
+                logImportant(`✅ Ligne ${rowIndex}: "${currentSubject}" appliquée`);
+                processedCount++;
+                
+                // Attendre entre chaque action
+                await delay(AUTOMATION_CONFIG.delayBetweenActions);
+                
+            } catch (error) {
+                logAction(`❌ Ligne ${rowIndex}: Erreur - ${error.message}`, 'error');
+            }
+        }
+        // Si la ligne est vide et qu'on n'a pas de matière de référence
+        else if (currentValue === '' && currentSubject === '') {
+            logAction(`⚠️ Ligne ${rowIndex}: Vide, en attente d'une matière de référence`);
+        }
+        
+        // Attendre entre chaque ligne
+        await delay(AUTOMATION_CONFIG.delayBetweenCycles);
+    }
+    
+    // Arrêter l'automatisation
+    logImportant(`✅ Remplissage terminé - ${processedCount} lignes traitées`, 'success');
+    stopAutomation(true);
+}
+
+// Fonction pour définir la valeur d'un select
+async function setSubjectValue(select, subjectText) {
+    // Chercher l'option correspondante
+    const options = select.querySelectorAll('option');
+    let targetOption = null;
+    
+    for (const option of options) {
+        if (option.textContent.trim() === subjectText) {
+            targetOption = option;
+            break;
+        }
+    }
+    
+    if (!targetOption) {
+        throw new Error(`Option "${subjectText}" non trouvée`);
+    }
+    
+    // Cliquer sur le select pour le focaliser
+    await clickElement(select);
+    await delay(100);
+    
+    // Définir la valeur
+    select.value = targetOption.value;
+    select.selectedIndex = targetOption.index;
+    
+    // Déclencher les événements
+    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+    const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+    
+    select.dispatchEvent(inputEvent);
+    select.dispatchEvent(changeEvent);
+    
+    logAction(`  📡 Événements déclenchés pour "${subjectText}"`);
+}
+
+// Exposer la fonction de test pour le remplissage automatique
+window.tempoListTestPattern = function() {
+    logAction('🧪 Test du remplissage automatique');
+    startPatternFill({ tagName: 'SELECT' });
+}; 
