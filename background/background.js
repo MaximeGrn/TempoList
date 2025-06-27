@@ -24,6 +24,53 @@ chrome.runtime.onInstalled.addListener(async () => {
             }
         });
     }
+    
+    // Créer le menu contextuel pour l'automatisation
+    createContextMenu();
+});
+
+// Créer le menu contextuel
+function createContextMenu() {
+    chrome.contextMenus.removeAll(() => {
+        chrome.contextMenus.create({
+            id: "autoFillCommune",
+            title: "🔄 Auto-remplir Commune",
+            contexts: ["all"]
+        });
+        
+        chrome.contextMenus.create({
+            id: "stopAutomation",
+            title: "⏹️ Arrêter l'automatisation",
+            contexts: ["all"]
+        });
+    });
+}
+
+// Variables pour stocker les informations de l'élément cible
+let currentElementInfo = null;
+
+// Gestionnaire pour les clics sur le menu contextuel
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === "autoFillCommune") {
+        // Démarrer l'automatisation
+        if (currentElementInfo) {
+            chrome.tabs.sendMessage(tab.id, {
+                action: 'startAutomation',
+                element: currentElementInfo
+            });
+        } else {
+            // Essayer de démarrer sans élément spécifique
+            chrome.tabs.sendMessage(tab.id, {
+                action: 'startAutomation',
+                element: { tagName: 'SELECT' } // Par défaut, chercher un select
+            });
+        }
+    } else if (info.menuItemId === "stopAutomation") {
+        // Arrêter l'automatisation
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'stopAutomation'
+        });
+    }
 });
 
 // Gestionnaire pour les messages entre les différentes parties de l'extension
@@ -36,6 +83,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'addListCompleted') {
         addListCompleted().then(sendResponse);
         return true;
+    }
+    
+    if (request.action === 'elementRightClicked') {
+        // Stocker les informations de l'élément sur lequel l'utilisateur a fait clic droit
+        currentElementInfo = request.elementInfo;
+        sendResponse({ success: true });
     }
 });
 
