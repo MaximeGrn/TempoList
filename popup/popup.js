@@ -192,6 +192,42 @@ function getWorkStartTime() {
     return workStartTime;
 }
 
+// Calculer le temps de travail effectif (en excluant les pauses)
+function calculateEffectiveWorkTime(startTime, endTime) {
+    const activeTeam = getActiveTeam();
+    if (!activeTeam || !activeTeam.schedules || activeTeam.schedules.length <= 1) {
+        return endTime - startTime; // Pas de pause à soustraire
+    }
+    
+    let effectiveTime = endTime - startTime;
+    const today = new Date();
+    
+    // Parcourir les pauses et les soustraire si elles sont comprises dans la période
+    for (let i = 0; i < activeTeam.schedules.length - 1; i++) {
+        const currentSchedule = activeTeam.schedules[i];
+        const nextSchedule = activeTeam.schedules[i + 1];
+        
+        const [endHours, endMinutes] = currentSchedule.end.split(':').map(Number);
+        const [nextStartHours, nextStartMinutes] = nextSchedule.start.split(':').map(Number);
+        
+        const breakStart = new Date(today);
+        breakStart.setHours(endHours, endMinutes, 0, 0);
+        
+        const breakEnd = new Date(today);
+        breakEnd.setHours(nextStartHours, nextStartMinutes, 0, 0);
+        
+        // Si la pause est comprise dans la période de travail, la soustraire
+        const pauseStartInPeriod = Math.max(breakStart.getTime(), startTime);
+        const pauseEndInPeriod = Math.min(breakEnd.getTime(), endTime);
+        
+        if (pauseStartInPeriod < pauseEndInPeriod) {
+            effectiveTime -= (pauseEndInPeriod - pauseStartInPeriod);
+        }
+    }
+    
+    return effectiveTime;
+}
+
 // Calculer le temps moyen réel depuis le début de la journée de travail
 function calculateAverageRealTime() {
     const timestamps = currentData.currentDay.timestamps;
@@ -215,12 +251,12 @@ function calculateAverageRealTime() {
         return totalTime / (timestamps.length - 1);
     }
     
-    // Calculer le temps écoulé depuis le début de travail jusqu'à la dernière validation
+    // Calculer le temps de travail effectif depuis le début (en excluant les pauses)
     const lastTimestamp = timestamps[timestamps.length - 1];
-    const elapsedTime = lastTimestamp - workStartTime.getTime();
+    const effectiveTime = calculateEffectiveWorkTime(workStartTime.getTime(), lastTimestamp);
     
-    // Temps moyen = temps écoulé / nombre de listes validées
-    return currentData.currentDay.count > 0 ? elapsedTime / currentData.currentDay.count : 0;
+    // Temps moyen = temps effectif / nombre de listes validées
+    return currentData.currentDay.count > 0 ? effectiveTime / currentData.currentDay.count : 0;
 }
 
 // Calculer le temps théorique par liste
@@ -241,6 +277,45 @@ function calculateTheoreticalTime() {
     });
     
     return currentData.dailyTarget > 0 ? totalWorkTime / currentData.dailyTarget : 0;
+}
+
+// Ajuster l'heure de fin en tenant compte des pauses
+function adjustFinishTimeForBreaks(estimatedFinishTime) {
+    const activeTeam = getActiveTeam();
+    if (!activeTeam || !activeTeam.schedules || activeTeam.schedules.length <= 1) {
+        return estimatedFinishTime; // Pas de pause à gérer
+    }
+    
+    const now = new Date();
+    const today = new Date();
+    let adjustedTime = new Date(estimatedFinishTime);
+    
+    // Parcourir les créneaux pour identifier les pauses
+    for (let i = 0; i < activeTeam.schedules.length - 1; i++) {
+        const currentSchedule = activeTeam.schedules[i];
+        const nextSchedule = activeTeam.schedules[i + 1];
+        
+        // Calculer les heures de fin de créneau actuel et début du suivant
+        const [endHours, endMinutes] = currentSchedule.end.split(':').map(Number);
+        const [nextStartHours, nextStartMinutes] = nextSchedule.start.split(':').map(Number);
+        
+        const breakStart = new Date(today);
+        breakStart.setHours(endHours, endMinutes, 0, 0);
+        
+        const breakEnd = new Date(today);
+        breakEnd.setHours(nextStartHours, nextStartMinutes, 0, 0);
+        
+        // Si la projection traverse cette pause (maintenant < début pause ET projection > début pause)
+        if (now <= breakStart && estimatedFinishTime > breakStart) {
+            const breakDuration = breakEnd.getTime() - breakStart.getTime();
+            adjustedTime = new Date(adjustedTime.getTime() + breakDuration);
+            
+            // Mettre à jour estimatedFinishTime pour les pauses suivantes
+            estimatedFinishTime = new Date(adjustedTime);
+        }
+    }
+    
+    return adjustedTime;
 }
 
 // Calculer la projection (heure de fin estimée)
@@ -268,10 +343,13 @@ function calculateProjection() {
         const timeNeeded = remaining * timePerList;
         
         // Heure de fin estimée = maintenant + temps nécessaire
-        const finishTime = new Date(Date.now() + timeNeeded);
+        const rawFinishTime = new Date(Date.now() + timeNeeded);
         
-        const hours = finishTime.getHours().toString().padStart(2, '0');
-        const minutes = finishTime.getMinutes().toString().padStart(2, '0');
+        // Ajuster pour tenir compte des pauses
+        const adjustedFinishTime = adjustFinishTimeForBreaks(rawFinishTime);
+        
+        const hours = adjustedFinishTime.getHours().toString().padStart(2, '0');
+        const minutes = adjustedFinishTime.getMinutes().toString().padStart(2, '0');
         
         return `Fin vers ${hours}h${minutes}`;
     } else {
