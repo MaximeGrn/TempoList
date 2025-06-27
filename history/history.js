@@ -38,7 +38,6 @@ function setupEventListeners() {
     // Actions principales supprimées (export CSV et clear all)
 
     // Modal
-    document.getElementById('closeModal').addEventListener('click', closeModal);
     document.getElementById('modalOverlay').addEventListener('click', closeModal);
     document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
     document.getElementById('cancelEditBtn').addEventListener('click', closeModal);
@@ -135,9 +134,8 @@ function createHistoryRow(day, index) {
     // Calculer la durée corrigée basée sur les horaires de l'équipe
     const duration = calculateCorrectDuration(day);
     
-    const avgTime = day.timestamps.length > 1 
-        ? formatTime(calculateDayAverageTime(day))
-        : '--';
+    // Calculer le temps moyen : durée totale / nombre de listes
+    const avgTime = calculateSimpleAverageTime(day);
 
     const dailyTarget = day.dailyTarget || 0;
     const objectiveText = dailyTarget > 0 ? dailyTarget : '--';
@@ -206,16 +204,51 @@ function getTeamName(teamId) {
     return team ? team.name : null;
 }
 
-// Calculer le temps moyen d'une journée
-function calculateDayAverageTime(day) {
-    if (day.timestamps.length < 2) return 0;
-    
-    let totalTime = 0;
-    for (let i = 1; i < day.timestamps.length; i++) {
-        totalTime += day.timestamps[i] - day.timestamps[i - 1];
+// Calculer le temps moyen simple : durée totale / nombre de listes
+function calculateSimpleAverageTime(day) {
+    if (!day.timestamps || day.timestamps.length < 2 || day.count === 0) {
+        return '--';
     }
     
-    return totalTime / (day.timestamps.length - 1);
+    // Obtenir la durée corrigée
+    const duration = calculateCorrectDuration(day);
+    
+    if (duration === '--') {
+        return '--';
+    }
+    
+    // Convertir la durée en millisecondes pour le calcul
+    const durationMs = parseDurationToMs(duration);
+    if (durationMs === 0) {
+        return '--';
+    }
+    
+    // Temps moyen = durée totale / nombre de listes
+    const avgTimeMs = durationMs / day.count;
+    
+    return formatTime(avgTimeMs);
+}
+
+// Convertir une durée formatée en millisecondes
+function parseDurationToMs(durationString) {
+    if (durationString === '--') return 0;
+    
+    // Format attendu : "6h02" ou "30min15s"
+    const hourMatch = durationString.match(/(\d+)h(\d+)/);
+    if (hourMatch) {
+        const hours = parseInt(hourMatch[1]);
+        const minutes = parseInt(hourMatch[2]);
+        return (hours * 60 + minutes) * 60 * 1000;
+    }
+    
+    const minuteMatch = durationString.match(/(\d+)min(\d+)s/);
+    if (minuteMatch) {
+        const minutes = parseInt(minuteMatch[1]);
+        const seconds = parseInt(minuteMatch[2]);
+        return (minutes * 60 + seconds) * 1000;
+    }
+    
+    return 0;
 }
 
 // Mettre à jour les statistiques
@@ -304,19 +337,36 @@ async function saveEdit() {
     try {
         // Mettre à jour l'entrée
         const entry = historyData[currentEditIndex];
-        entry.date = new Date(newDate).toDateString();
+        const oldDate = new Date(entry.date);
+        const newDateObj = new Date(newDate);
+        
         entry.count = newCount;
         entry.activeTeam = newTeam;
         entry.dailyTarget = newObjective;
         
-        // Ajuster les timestamps si nécessaire
-        if (newCount < entry.timestamps.length) {
+        // Si la date change, ajuster tous les timestamps pour conserver les intervalles relatifs
+        if (oldDate.toDateString() !== newDateObj.toDateString()) {
+            const dateDiff = newDateObj.getTime() - oldDate.getTime();
+            
+            // Ajuster tous les timestamps
+            entry.timestamps = entry.timestamps.map(timestamp => timestamp + dateDiff);
+        }
+        
+        // Mettre à jour la date après avoir ajusté les timestamps
+        entry.date = newDateObj.toDateString();
+        
+        // Ajuster les timestamps si le nombre de listes change
+        if (newCount < entry.timestamps.length - 1) {
             entry.timestamps = entry.timestamps.slice(0, newCount + 1);
         } else if (newCount > entry.timestamps.length - 1) {
-            // Ajouter des timestamps fictifs
-            const baseTime = entry.timestamps.length > 0 ? entry.timestamps[0] : Date.now();
+            // Ajouter des timestamps fictifs en gardant un intervalle cohérent
+            const baseTime = entry.timestamps.length > 0 ? entry.timestamps[entry.timestamps.length - 1] : Date.now();
+            const avgInterval = entry.timestamps.length > 1 ? 
+                (entry.timestamps[entry.timestamps.length - 1] - entry.timestamps[0]) / (entry.timestamps.length - 1) : 
+                10 * 60 * 1000; // 10 minutes par défaut
+            
             while (entry.timestamps.length <= newCount) {
-                entry.timestamps.push(baseTime + (entry.timestamps.length * 10 * 60 * 1000)); // 10 min d'intervalle
+                entry.timestamps.push(baseTime + (avgInterval * (entry.timestamps.length - entry.timestamps.indexOf(baseTime))));
             }
         }
         
