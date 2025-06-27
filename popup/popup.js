@@ -109,12 +109,27 @@ function updateCounter() {
 function updateProgressCircle() {
     const canvas = document.getElementById('progressCanvas');
     const ctx = canvas.getContext('2d');
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    
+    // Utiliser une résolution plus élevée pour un rendu plus net
+    const dpr = window.devicePixelRatio || 1;
+    const displaySize = 120;
+    const actualSize = displaySize * dpr;
+    
+    // Redimensionner le canvas pour la haute résolution
+    canvas.width = actualSize;
+    canvas.height = actualSize;
+    canvas.style.width = displaySize + 'px';
+    canvas.style.height = displaySize + 'px';
+    
+    // Mettre à l'échelle le contexte pour la haute résolution
+    ctx.scale(dpr, dpr);
+    
+    const centerX = displaySize / 2;
+    const centerY = displaySize / 2;
     const radius = 45;
     
     // Effacer le canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, displaySize, displaySize);
     
     // Calculer le pourcentage
     const percentage = currentData.dailyTarget > 0 
@@ -159,20 +174,53 @@ function updateStats() {
     document.getElementById('projection').textContent = projection;
 }
 
-// Calculer le temps moyen réel entre les listes
+// Obtenir l'heure de début de travail de l'équipe active pour aujourd'hui
+function getWorkStartTime() {
+    const activeTeam = getActiveTeam();
+    if (!activeTeam || !activeTeam.schedules || activeTeam.schedules.length === 0) {
+        return null;
+    }
+    
+    // Prendre le premier créneau de la journée comme heure de début
+    const firstSchedule = activeTeam.schedules[0];
+    const today = new Date();
+    const [startHours, startMinutes] = firstSchedule.start.split(':').map(Number);
+    
+    const workStartTime = new Date(today);
+    workStartTime.setHours(startHours, startMinutes, 0, 0);
+    
+    return workStartTime;
+}
+
+// Calculer le temps moyen réel depuis le début de la journée de travail
 function calculateAverageRealTime() {
     const timestamps = currentData.currentDay.timestamps;
     
-    if (timestamps.length < 2) {
+    if (timestamps.length === 0) {
         return 0;
     }
     
-    let totalTime = 0;
-    for (let i = 1; i < timestamps.length; i++) {
-        totalTime += timestamps[i] - timestamps[i - 1];
+    const workStartTime = getWorkStartTime();
+    if (!workStartTime) {
+        // Si pas d'équipe définie, utiliser l'ancien calcul
+        if (timestamps.length < 2) {
+            return 0;
+        }
+        
+        let totalTime = 0;
+        for (let i = 1; i < timestamps.length; i++) {
+            totalTime += timestamps[i] - timestamps[i - 1];
+        }
+        
+        return totalTime / (timestamps.length - 1);
     }
     
-    return totalTime / (timestamps.length - 1);
+    // Calculer le temps écoulé depuis le début de travail jusqu'à la dernière validation
+    const lastTimestamp = timestamps[timestamps.length - 1];
+    const elapsedTime = lastTimestamp - workStartTime.getTime();
+    
+    // Temps moyen = temps écoulé / nombre de listes validées
+    return currentData.currentDay.count > 0 ? elapsedTime / currentData.currentDay.count : 0;
 }
 
 // Calculer le temps théorique par liste
@@ -197,9 +245,9 @@ function calculateTheoreticalTime() {
 
 // Calculer la projection (heure de fin estimée)
 function calculateProjection() {
-    const avgRealTime = calculateAverageRealTime();
+    const workStartTime = getWorkStartTime();
     
-    if (avgRealTime === 0 || currentData.currentDay.count === 0) {
+    if (currentData.currentDay.count === 0) {
         return '--';
     }
     
@@ -208,21 +256,86 @@ function calculateProjection() {
         return 'Objectif atteint !';
     }
     
-    const timeNeeded = remaining * avgRealTime; // en millisecondes
-    const finishTime = new Date(Date.now() + timeNeeded);
-    
-    const hours = finishTime.getHours().toString().padStart(2, '0');
-    const minutes = finishTime.getMinutes().toString().padStart(2, '0');
-    
-    return `Fin vers ${hours}h${minutes}`;
+    // Si on a une équipe avec horaires
+    if (workStartTime) {
+        const avgRealTime = calculateAverageRealTime();
+        if (avgRealTime === 0) {
+            return '--';
+        }
+        
+        // Calculer le temps nécessaire pour terminer les listes restantes
+        const timePerList = avgRealTime; // Temps moyen par liste depuis le début
+        const timeNeeded = remaining * timePerList;
+        
+        // Heure de fin estimée = maintenant + temps nécessaire
+        const finishTime = new Date(Date.now() + timeNeeded);
+        
+        const hours = finishTime.getHours().toString().padStart(2, '0');
+        const minutes = finishTime.getMinutes().toString().padStart(2, '0');
+        
+        return `Fin vers ${hours}h${minutes}`;
+    } else {
+        // Méthode de calcul original si pas d'équipe
+        const avgRealTime = calculateAverageRealTime();
+        
+        if (avgRealTime === 0) {
+            return '--';
+        }
+        
+        const timeNeeded = remaining * avgRealTime;
+        const finishTime = new Date(Date.now() + timeNeeded);
+        
+        const hours = finishTime.getHours().toString().padStart(2, '0');
+        const minutes = finishTime.getMinutes().toString().padStart(2, '0');
+        
+        return `Fin vers ${hours}h${minutes}`;
+    }
 }
 
 // Calculer le statut (avance/à l'heure/retard)
 function calculateStatus() {
+    const workStartTime = getWorkStartTime();
+    const now = new Date();
+    
+    // Si pas d'équipe définie, utiliser l'ancien calcul
+    if (!workStartTime) {
+        const avgRealTime = calculateAverageRealTime();
+        const avgTheoTime = calculateTheoreticalTime();
+        
+        if (avgRealTime === 0 || avgTheoTime === 0) {
+            return 'neutral';
+        }
+        
+        const ratio = avgRealTime / avgTheoTime;
+        
+        if (ratio < 0.9) return 'ahead';      // 10% plus rapide
+        if (ratio > 1.1) return 'behind';     // 10% plus lent
+        return 'ontime';
+    }
+    
+    // Temps écoulé depuis le début de travail
+    const elapsedTime = now.getTime() - workStartTime.getTime();
+    
+    // Si la journée n'a pas encore commencé
+    if (elapsedTime < 0) {
+        return 'neutral';
+    }
+    
+    // Si aucune liste n'a été validée
+    if (currentData.currentDay.count === 0) {
+        // Calculer le temps théorique pour la première liste
+        const avgTheoTime = calculateTheoreticalTime();
+        if (avgTheoTime > 0 && elapsedTime > avgTheoTime) {
+            return 'behind'; // En retard pour la première liste
+        }
+        return 'neutral';
+    }
+    
+    // Comparer le temps moyen réel avec le temps théorique
     const avgRealTime = calculateAverageRealTime();
     const avgTheoTime = calculateTheoreticalTime();
     
-    if (avgRealTime === 0 || avgTheoTime === 0) {
+    if (avgTheoTime === 0) {
         return 'neutral';
     }
     
@@ -238,17 +351,30 @@ function updateStatus() {
     const status = calculateStatus();
     const statusText = document.getElementById('statusText');
     const statusColor = document.getElementById('statusColor');
+    const workStartTime = getWorkStartTime();
+    const now = new Date();
     
     // Retirer les classes existantes
     statusColor.classList.remove('ahead', 'ontime', 'behind', 'started');
     
-    // Si on a au moins une liste, on affiche "Commencé"
-    if (currentData.currentDay.count > 0 && status === 'neutral') {
-        statusText.textContent = 'Commencé';
-        statusColor.classList.add('started');
+    // Si on a une équipe et que la journée n'a pas encore commencé
+    if (workStartTime && now < workStartTime) {
+        statusText.textContent = 'Pas encore commencé';
         return;
     }
     
+    // Si aucune liste n'a été validée mais qu'on devrait avoir commencé
+    if (currentData.currentDay.count === 0) {
+        if (status === 'behind') {
+            statusText.textContent = 'En retard';
+            statusColor.classList.add('behind');
+        } else {
+            statusText.textContent = 'Pas encore commencé';
+        }
+        return;
+    }
+    
+    // Si on a au moins une liste, afficher le statut approprié
     switch (status) {
         case 'ahead':
             statusText.textContent = 'En avance';
@@ -263,7 +389,8 @@ function updateStatus() {
             statusColor.classList.add('ontime');
             break;
         default:
-            statusText.textContent = 'Pas encore commencé';
+            statusText.textContent = 'Commencé';
+            statusColor.classList.add('started');
             break;
     }
 }
@@ -411,8 +538,6 @@ function updateButtons() {
     
     decrementBtn.disabled = !canDecrement;
 }
-
-
 
 // Fonctions utilitaires
 
