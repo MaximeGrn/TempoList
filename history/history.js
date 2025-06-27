@@ -131,9 +131,10 @@ function createHistoryRow(day, index) {
     
     const date = new Date(day.date).toLocaleDateString('fr-FR');
     const teamName = getTeamName(day.activeTeam);
-    const duration = day.timestamps.length > 1 
-        ? formatTime(day.timestamps[day.timestamps.length - 1] - day.timestamps[0])
-        : '--';
+    
+    // Calculer la durée corrigée basée sur les horaires de l'équipe
+    const duration = calculateCorrectDuration(day);
+    
     const avgTime = day.timestamps.length > 1 
         ? formatTime(calculateDayAverageTime(day))
         : '--';
@@ -165,22 +166,22 @@ function createHistoryRow(day, index) {
     }
     
     row.innerHTML = `
-        <td>${date}</td>
-        <td>${teamName ? `<span class="team-badge">${teamName}</span>` : '--'}</td>
-        <td><strong>${day.count}</strong></td>
-        <td>${objectiveText}</td>
-        <td>${statusText}</td>
-        <td>${duration}</td>
-        <td>${avgTime}</td>
-        <td>
+        <td class="cell-date">${date}</td>
+        <td class="cell-team">${teamName ? `<span class="team-badge">${teamName}</span>` : '--'}</td>
+        <td class="cell-count"><strong>${day.count}</strong></td>
+        <td class="cell-objective">${objectiveText}</td>
+        <td class="cell-status">${statusText}</td>
+        <td class="cell-duration">${duration}</td>
+        <td class="cell-avgtime">${avgTime}</td>
+        <td class="cell-actions">
             <div class="action-buttons">
-                <button class="action-btn edit-btn" data-index="${index}">
+                <button class="action-btn edit-btn" data-index="${index}" title="Éditer">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
                       <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
                       <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
                     </svg>
                 </button>
-                <button class="action-btn delete-btn" data-index="${index}">
+                <button class="action-btn delete-btn" data-index="${index}" title="Supprimer">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
                       <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
                     </svg>
@@ -242,6 +243,7 @@ function editEntry(index) {
     document.getElementById('editDate').value = new Date(day.date).toISOString().split('T')[0];
     document.getElementById('editCount').value = day.count;
     document.getElementById('editTeam').value = day.activeTeam || '';
+    document.getElementById('editObjective').value = day.dailyTarget || '';
     
     // Afficher le modal
     showModal();
@@ -292,6 +294,7 @@ async function saveEdit() {
     const newDate = document.getElementById('editDate').value;
     const newCount = parseInt(document.getElementById('editCount').value);
     const newTeam = document.getElementById('editTeam').value || null;
+    const newObjective = parseInt(document.getElementById('editObjective').value) || 0;
     
     if (!newDate || isNaN(newCount) || newCount < 0) {
         alert('Veuillez saisir des valeurs valides.');
@@ -304,14 +307,15 @@ async function saveEdit() {
         entry.date = new Date(newDate).toDateString();
         entry.count = newCount;
         entry.activeTeam = newTeam;
+        entry.dailyTarget = newObjective;
         
         // Ajuster les timestamps si nécessaire
         if (newCount < entry.timestamps.length) {
-            entry.timestamps = entry.timestamps.slice(0, newCount);
-        } else if (newCount > entry.timestamps.length) {
+            entry.timestamps = entry.timestamps.slice(0, newCount + 1);
+        } else if (newCount > entry.timestamps.length - 1) {
             // Ajouter des timestamps fictifs
             const baseTime = entry.timestamps.length > 0 ? entry.timestamps[0] : Date.now();
-            while (entry.timestamps.length < newCount) {
+            while (entry.timestamps.length <= newCount) {
                 entry.timestamps.push(baseTime + (entry.timestamps.length * 10 * 60 * 1000)); // 10 min d'intervalle
             }
         }
@@ -325,6 +329,52 @@ async function saveEdit() {
         console.error('Erreur lors de la sauvegarde:', error);
         alert('Erreur lors de la sauvegarde des modifications.');
     }
+}
+
+// Calculer la durée corrigée basée sur les horaires de l'équipe
+function calculateCorrectDuration(day) {
+    if (!day.timestamps || day.timestamps.length === 0) {
+        return '--';
+    }
+    
+    const team = teams.find(t => t.id === day.activeTeam);
+    if (!team || !team.schedules || team.schedules.length === 0) {
+        // Si pas d'équipe définie, utiliser l'ancien calcul
+        return day.timestamps.length > 1 
+            ? formatTime(day.timestamps[day.timestamps.length - 1] - day.timestamps[0])
+            : '--';
+    }
+    
+    // Prendre l'heure de la dernière liste validée
+    const lastValidationTime = new Date(day.timestamps[day.timestamps.length - 1]);
+    
+    // Convertir les horaires de l'équipe pour la date de la journée
+    const dayDate = new Date(day.date);
+    const workStartTime = new Date(dayDate);
+    const firstSchedule = team.schedules[0];
+    const [startHours, startMinutes] = firstSchedule.start.split(':').map(Number);
+    workStartTime.setHours(startHours, startMinutes, 0, 0);
+    
+    // Calculer le temps de pause total
+    let totalBreakTime = 0;
+    if (team.schedules.length > 1) {
+        for (let i = 0; i < team.schedules.length - 1; i++) {
+            const currentEnd = new Date(dayDate);
+            const [endHours, endMinutes] = team.schedules[i].end.split(':').map(Number);
+            currentEnd.setHours(endHours, endMinutes, 0, 0);
+            
+            const nextStart = new Date(dayDate);
+            const [nextStartHours, nextStartMinutes] = team.schedules[i + 1].start.split(':').map(Number);
+            nextStart.setHours(nextStartHours, nextStartMinutes, 0, 0);
+            
+            totalBreakTime += nextStart.getTime() - currentEnd.getTime();
+        }
+    }
+    
+    // Calculer la durée : heure dernière validation - heure début - temps pause
+    const workDuration = lastValidationTime.getTime() - workStartTime.getTime() - totalBreakTime;
+    
+    return workDuration > 0 ? formatTime(workDuration) : '--';
 }
 
 // Fonctions d'export et de suppression globale supprimées selon la demande utilisateur
