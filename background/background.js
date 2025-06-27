@@ -37,12 +37,6 @@ function createContextMenu() {
             title: "🔄 Auto-remplir Commune",
             contexts: ["all"]
         });
-        
-        chrome.contextMenus.create({
-            id: "stopAutomation",
-            title: "⏹️ Arrêter l'automatisation",
-            contexts: ["all"]
-        });
     });
 }
 
@@ -65,11 +59,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 element: { tagName: 'SELECT' } // Par défaut, chercher un select
             });
         }
-    } else if (info.menuItemId === "stopAutomation") {
-        // Arrêter l'automatisation
-        chrome.tabs.sendMessage(tab.id, {
-            action: 'stopAutomation'
-        });
     }
 });
 

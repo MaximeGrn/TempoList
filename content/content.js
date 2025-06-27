@@ -6,13 +6,29 @@ let debugPanel = null;
 let actionCount = 0;
 let currentRowIndex = -1; // Pour suivre la ligne actuelle dans AG-Grid
 
-// Configuration de l'automatisation
-const AUTOMATION_CONFIG = {
+// Configuration de l'automatisation (valeurs par défaut)
+let AUTOMATION_CONFIG = {
     initialKey: 'r', // Lettre à taper pour commencer
     downArrowCount: 2, // Nombre de flèches vers le bas
     delayBetweenActions: 200, // Délai entre chaque action (ms)
     delayBetweenCycles: 800 // Délai entre chaque cycle complet (ms) - réduit car sélection directe
 };
+
+// Charger la configuration depuis le stockage
+async function loadConfig() {
+    try {
+        const result = await chrome.storage.sync.get('automationConfig');
+        if (result.automationConfig) {
+            AUTOMATION_CONFIG = { ...AUTOMATION_CONFIG, ...result.automationConfig };
+            logAction(`Configuration chargée: ${JSON.stringify(AUTOMATION_CONFIG)}`);
+        }
+    } catch (error) {
+        logAction(`Erreur lors du chargement de la configuration: ${error.message}`, 'error');
+    }
+}
+
+// Charger la configuration au démarrage du script
+loadConfig();
 
 // Écouter les messages du background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -25,13 +41,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-// Écouter les événements clavier pour arrêter avec Échap
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && isAutomationRunning) {
-        stopAutomation();
-        showNotification('Automatisation arrêtée');
+// Fonction pour gérer la touche Échap
+function handleEscapeKey(event) {
+    if (event.key === 'Escape' && (isAutomationRunning || debugPanel)) {
+        if (isAutomationRunning) {
+            stopAutomation();
+            showNotification('Automatisation arrêtée');
+        } else if (debugPanel) {
+            removeDebugPanel();
+        }
     }
-});
+}
+
+// Écouter les événements clavier pour arrêter avec Échap
+document.addEventListener('keydown', handleEscapeKey);
 
 // Fonction pour démarrer l'automatisation
 function startAutomation(elementInfo) {
@@ -50,19 +73,17 @@ function startAutomation(elementInfo) {
     currentTargetElement = findTargetElement(elementInfo);
     
     if (!currentTargetElement) {
-        logAction('❌ Impossible de trouver l\'élément à automatiser', 'error');
+        logImportant('❌ Impossible de trouver l\'élément à automatiser', 'error');
         showNotification('Impossible de trouver l\'élément à automatiser', 'error');
         return;
     }
 
-    logAction(`✅ Élément trouvé: ${currentTargetElement.tagName} (${currentTargetElement.type || 'N/A'})`, 'success');
-    
     // Identifier la ligne de départ
     currentRowIndex = getRowIndex(currentTargetElement);
     if (currentRowIndex !== -1) {
-        logAction(`📍 Ligne de départ: ${currentRowIndex}`, 'success');
+        logImportant(`🎯 Démarrage ligne ${currentRowIndex}`, 'success');
     } else {
-        logAction('⚠️ Impossible de déterminer la ligne de départ', 'error');
+        logImportant('⚠️ Impossible de déterminer la ligne de départ', 'error');
     }
     
     isAutomationRunning = true;
@@ -75,8 +96,20 @@ function startAutomation(elementInfo) {
 }
 
 // Fonction pour arrêter l'automatisation
-function stopAutomation() {
-    logAction('🛑 Arrêt de l\'automatisation');
+function stopAutomation(isAutoStop = false) {
+    if (isAutoStop) {
+        logImportant(`✅ Automatisation terminée - ${actionCount} lignes traitées`, 'success');
+        // Fermer automatiquement après 2 secondes
+        setTimeout(() => {
+            removeDebugPanel();
+        }, 2000);
+    } else {
+        logAction('🛑 Arrêt de l\'automatisation');
+        // Fermer après 5 secondes pour un arrêt manuel
+        setTimeout(() => {
+            removeDebugPanel();
+        }, 5000);
+    }
     
     if (automationInterval) {
         clearInterval(automationInterval);
@@ -84,11 +117,6 @@ function stopAutomation() {
     }
     isAutomationRunning = false;
     currentTargetElement = null;
-    
-    // Garder le panneau de débogage ouvert pour 5 secondes de plus
-    setTimeout(() => {
-        removeDebugPanel();
-    }, 5000);
 }
 
 // Créer le panneau de débogage
@@ -143,30 +171,36 @@ function removeDebugPanel() {
     }
 }
 
-// Fonction pour logger les actions
-function logAction(message, type = 'info') {
+// Fonction pour logger les actions (version simplifiée)
+function logAction(message, type = 'info', isImportant = false) {
     console.log(`[TempoList] ${message}`);
     
-    if (debugPanel) {
+    // Afficher seulement les messages importants dans le panneau
+    if (debugPanel && isImportant) {
         const debugLog = document.getElementById('debug-log');
         if (debugLog) {
-            const timestamp = new Date().toLocaleTimeString();
-            const color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#ecf0f1';
+            const color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db';
             
             const logEntry = document.createElement('div');
             logEntry.style.cssText = `
-                margin-bottom: 5px;
-                padding: 3px 0;
+                margin-bottom: 8px;
+                padding: 8px;
                 color: ${color};
-                border-left: 3px solid ${color};
-                padding-left: 8px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 4px;
+                font-weight: bold;
             `;
-            logEntry.innerHTML = `<span style="color: #bdc3c7;">[${timestamp}]</span> ${message}`;
+            logEntry.innerHTML = message;
             
             debugLog.appendChild(logEntry);
             debugLog.scrollTop = debugLog.scrollHeight;
         }
     }
+}
+
+// Version simplifiée pour les logs importants
+function logImportant(message, type = 'info') {
+    logAction(message, type, true);
 }
 
 // Cycle principal d'automatisation
@@ -251,6 +285,9 @@ async function executeActionSequence() {
             // Attendre un peu que les événements soient traités
             await delay(AUTOMATION_CONFIG.delayBetweenActions);
             
+            // Marquer la ligne actuelle comme traitée
+            logImportant(`🔄 Ligne ${currentRowIndex + actionCount - 1} : Commune sélectionnée`);
+            
             // Trouver la ligne suivante
             logAction('  🔍 Recherche de la ligne suivante...');
             const nextElement = findNextRowElement();
@@ -276,23 +313,13 @@ async function executeActionSequence() {
                         currentTargetElement = nextElementAfterScroll;
                     } else {
                         // Vérifier si on s'est arrêté à cause d'une matière déjà sélectionnée
-                        const reasonMessage = actionCount > 1 ? 
-                            'Automatisation terminée - Toutes les lignes "Commune" traitées ✅' : 
-                            'Fin de la liste atteinte - Automatisation terminée';
-                        
-                        logAction(`  🏁 ${reasonMessage}`, 'success');
-                        stopAutomation();
-                        showNotification(reasonMessage, 'success');
+                        logImportant(`🔄 Ligne ${currentRowIndex + actionCount - 1} : Commune sélectionnée`);
+                        stopAutomation(true); // Auto-stop avec fermeture automatique
                         return;
                     }
                 } else {
-                    const reasonMessage = actionCount > 1 ? 
-                        'Automatisation terminée - Toutes les lignes "Commune" traitées ✅' : 
-                        'Fin de la liste atteinte - Automatisation terminée';
-                        
-                    logAction(`  🏁 ${reasonMessage}`, 'success');
-                    stopAutomation();
-                    showNotification(reasonMessage, 'success');
+                    logImportant(`🔄 Ligne ${currentRowIndex + actionCount - 1} : Commune sélectionnée`);
+                    stopAutomation(true); // Auto-stop avec fermeture automatique
                     return;
                 }
             }

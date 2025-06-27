@@ -10,8 +10,14 @@
     <div class="container">
         <header>
             <h1>⚙️ Configuration TempoList</h1>
+            <nav class="tabs">
+                <button class="tab-button active" data-tab="general">📊 Général</button>
+                <button class="tab-button" data-tab="automation">🔄 Automatisation</button>
+            </nav>
         </header>
 
+        <!-- Onglet Général -->
+        <div class="tab-content active" id="general-tab">
         <div class="section">
             <h2>🎯 Objectif journalier</h2>
             <div class="input-group">
@@ -75,6 +81,51 @@
                 </svg>
                 Retour au popup
             </button>
+        </div>
+        </div>
+
+        <!-- Onglet Automatisation -->
+        <div class="tab-content" id="automation-tab">
+            <div class="section">
+                <h2>⚡ Vitesse d'automatisation</h2>
+                <p class="description">
+                    Configurez la vitesse de remplissage automatique des matières "Commune".
+                    Une vitesse plus lente peut être nécessaire pour des sites plus lents.
+                </p>
+                
+                <div class="preset-buttons">
+                    <button type="button" class="preset-btn" data-preset="fast">🚀 Rapide</button>
+                    <button type="button" class="preset-btn active" data-preset="normal">⚡ Normal</button>
+                    <button type="button" class="preset-btn" data-preset="slow">🐌 Lent</button>
+                </div>
+
+                <div class="config-details">
+                    <div class="input-group">
+                        <label for="delayBetweenActions">
+                            Délai entre actions (ms) :
+                            <span class="help-text">Temps d'attente entre chaque action individuelle (minimum 100ms)</span>
+                        </label>
+                        <input type="number" id="delayBetweenActions" min="100" max="2000" value="200">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="delayBetweenCycles">
+                            Délai entre lignes (ms) :
+                            <span class="help-text">Temps d'attente avant de passer à la ligne suivante (minimum 300ms)</span>
+                        </label>
+                        <input type="number" id="delayBetweenCycles" min="300" max="5000" value="800">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="button" id="saveAutomationBtn" class="primary-btn">
+                        💾 Sauvegarder la configuration
+                    </button>
+                    <button type="button" id="resetAutomationBtn" class="secondary-btn">
+                        🔄 Réinitialiser
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="message" class="message"></div>

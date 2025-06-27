@@ -3,6 +3,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeOptions();
     setupEventListeners();
+    setupTabNavigation();
+    await loadAutomationConfig();
 });
 
 // Variables globales
@@ -313,4 +315,156 @@ function isValidTime(timeStr) {
 function timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
+}
+
+// === GESTION DES ONGLETS ===
+
+function setupTabNavigation() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const targetTab = e.currentTarget.dataset.tab;
+            switchTab(targetTab);
+        });
+    });
+}
+
+function switchTab(tabName) {
+    // Désactiver tous les onglets
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Activer l'onglet sélectionné
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+}
+
+// === GESTION DE L'AUTOMATISATION ===
+
+// Préréglages de vitesse
+const SPEED_PRESETS = {
+    fast: {
+        delayBetweenActions: 100,
+        delayBetweenCycles: 400
+    },
+    normal: {
+        delayBetweenActions: 200,
+        delayBetweenCycles: 800
+    },
+    slow: {
+        delayBetweenActions: 500,
+        delayBetweenCycles: 1500
+    }
+};
+
+let currentAutomationConfig = {
+    delayBetweenActions: 200,
+    delayBetweenCycles: 800
+};
+
+async function loadAutomationConfig() {
+    try {
+        const result = await chrome.storage.sync.get('automationConfig');
+        if (result.automationConfig) {
+            currentAutomationConfig = result.automationConfig;
+        }
+        
+        // Mettre à jour l'interface
+        updateAutomationUI();
+        setupAutomationEventListeners();
+        
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration d\'automatisation:', error);
+    }
+}
+
+function setupAutomationEventListeners() {
+    // Préréglages
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const preset = e.currentTarget.dataset.preset;
+            applyPreset(preset);
+        });
+    });
+    
+    // Sauvegarde
+    document.getElementById('saveAutomationBtn').addEventListener('click', saveAutomationConfig);
+    
+    // Réinitialisation
+    document.getElementById('resetAutomationBtn').addEventListener('click', resetAutomationConfig);
+    
+    // Mise à jour en temps réel des inputs
+    document.getElementById('delayBetweenActions').addEventListener('input', updateConfigFromInputs);
+    document.getElementById('delayBetweenCycles').addEventListener('input', updateConfigFromInputs);
+}
+
+function updateAutomationUI() {
+    // Mettre à jour les inputs
+    document.getElementById('delayBetweenActions').value = currentAutomationConfig.delayBetweenActions;
+    document.getElementById('delayBetweenCycles').value = currentAutomationConfig.delayBetweenCycles;
+    
+    // Détecter et marquer le préréglage actuel
+    const activePreset = detectActivePreset();
+    updatePresetButtons(activePreset);
+}
+
+function detectActivePreset() {
+    for (const [presetName, presetValues] of Object.entries(SPEED_PRESETS)) {
+        if (presetValues.delayBetweenActions === currentAutomationConfig.delayBetweenActions &&
+            presetValues.delayBetweenCycles === currentAutomationConfig.delayBetweenCycles) {
+            return presetName;
+        }
+    }
+    return null; // Configuration personnalisée
+}
+
+function updatePresetButtons(activePreset) {
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.preset === activePreset) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+function applyPreset(presetName) {
+    if (SPEED_PRESETS[presetName]) {
+        currentAutomationConfig = { ...SPEED_PRESETS[presetName] };
+        updateAutomationUI();
+    }
+}
+
+function updateConfigFromInputs() {
+    const delayBetweenActions = parseInt(document.getElementById('delayBetweenActions').value);
+    const delayBetweenCycles = parseInt(document.getElementById('delayBetweenCycles').value);
+    
+    currentAutomationConfig.delayBetweenActions = delayBetweenActions;
+    currentAutomationConfig.delayBetweenCycles = delayBetweenCycles;
+    
+    // Mettre à jour les boutons de préréglage
+    const activePreset = detectActivePreset();
+    updatePresetButtons(activePreset);
+}
+
+async function saveAutomationConfig() {
+    try {
+        await chrome.storage.sync.set({ automationConfig: currentAutomationConfig });
+        showMessage('Configuration d\'automatisation sauvegardée avec succès !', 'success');
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        showMessage('Erreur lors de la sauvegarde de la configuration.', 'error');
+    }
+}
+
+async function resetAutomationConfig() {
+    if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration d\'automatisation ?')) {
+        currentAutomationConfig = { ...SPEED_PRESETS.normal };
+        updateAutomationUI();
+        showMessage('Configuration réinitialisée aux valeurs par défaut.', 'success');
+    }
 } 

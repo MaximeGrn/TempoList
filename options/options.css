@@ -23,10 +23,57 @@ header {
 }
 
 header h1 {
-    margin: 0;
+    margin: 0 0 20px 0;
     font-size: 28px;
     color: #2c3e50;
     font-weight: 700;
+}
+
+/* Styles pour les onglets */
+.tabs {
+    display: flex;
+    gap: 4px;
+    background: #f1f3f4;
+    padding: 4px;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 16px;
+    background: transparent;
+    color: #6c757d;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tab-button:hover {
+    background: rgba(52, 152, 219, 0.1);
+    color: #3498db;
+}
+
+.tab-button.active {
+    background: #3498db;
+    color: white;
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+}
+
+/* Contenu des onglets */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
 }
 
 .section {
@@ -346,5 +393,79 @@ header h1 {
     
     .team-actions {
         justify-content: center;
+    }
+}
+
+/* Styles pour l'onglet automatisation */
+.description {
+    color: #6c757d;
+    font-size: 14px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.preset-btn {
+    flex: 1;
+    padding: 16px 20px;
+    background: white;
+    color: #6c757d;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 120px;
+}
+
+.preset-btn:hover {
+    border-color: #3498db;
+    background: rgba(52, 152, 219, 0.05);
+    color: #3498db;
+}
+
+.preset-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+    box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+}
+
+.config-details {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    margin-bottom: 24px;
+}
+
+.help-text {
+    display: block;
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: normal;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Responsive pour les presets */
+@media (max-width: 768px) {
+    .preset-buttons {
+        flex-direction: column;
+    }
+    
+    .preset-btn {
+        min-width: auto;
     }
 } 
