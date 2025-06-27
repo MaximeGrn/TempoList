@@ -27,23 +27,90 @@ chrome.runtime.onInstalled.addListener(async () => {
     
     // Créer le menu contextuel pour l'automatisation
     createContextMenu();
+    
+    // Initialiser le menu pour l'onglet actif après un court délai
+    setTimeout(initializeMenuForCurrentTab, 500);
+});
+
+// Écouter les changements d'onglet actif
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    await updateContextMenuForTab(activeInfo.tabId);
+});
+
+// Écouter les mises à jour d'URL dans les onglets
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    // Mettre à jour seulement si l'URL a changé et que la page est complètement chargée
+    if (changeInfo.url || (changeInfo.status === 'complete' && tab.active)) {
+        await updateContextMenuForTab(tabId);
+    }
+});
+
+// Initialiser le menu pour l'onglet actif au démarrage
+chrome.runtime.onStartup.addListener(async () => {
+    setTimeout(initializeMenuForCurrentTab, 500);
 });
 
 // Créer le menu contextuel
 function createContextMenu() {
     chrome.contextMenus.removeAll(() => {
-        chrome.contextMenus.create({
-            id: "autoFillCommune",
-            title: "🔄 Auto-remplir Commune",
-            contexts: ["all"]
-        });
-        
-        chrome.contextMenus.create({
-            id: "autoFillPattern",
-            title: "🎯 Remplissage automatique",
-            contexts: ["all"]
-        });
+        // Les menus contextuels seront créés dynamiquement selon l'URL
+        console.log('Menu contextuel initialisé (sera créé selon l\'URL)');
     });
+}
+
+// Créer les menus contextuels spécifiques à crealiste.com
+function createCrealisteContextMenu() {
+    chrome.contextMenus.create({
+        id: "autoFillCommune",
+        title: "🔄 Auto-remplir Commune",
+        contexts: ["all"],
+        documentUrlPatterns: ["*://crealiste.com/*", "*://*.crealiste.com/*"]
+    });
+    
+    chrome.contextMenus.create({
+        id: "autoFillPattern",
+        title: "🎯 Remplissage automatique",
+        contexts: ["all"],
+        documentUrlPatterns: ["*://crealiste.com/*", "*://*.crealiste.com/*"]
+    });
+}
+
+// Fonction pour mettre à jour les menus contextuels selon l'URL
+async function updateContextMenuForTab(tabId) {
+    try {
+        const tab = await chrome.tabs.get(tabId);
+        const isCrealiste = tab.url && (
+            tab.url.includes('crealiste.com') ||
+            tab.url.includes('www.crealiste.com')
+        );
+        
+        console.log(`Mise à jour menu contextuel pour: ${tab.url} - Crealiste: ${isCrealiste}`);
+        
+        // Supprimer tous les menus existants
+        chrome.contextMenus.removeAll(() => {
+            if (isCrealiste) {
+                // Créer les menus spécifiques à crealiste
+                createCrealisteContextMenu();
+                console.log('Menus contextuels TempoList activés pour crealiste.com');
+            } else {
+                console.log('Menus contextuels TempoList désactivés (pas sur crealiste.com)');
+            }
+        });
+    } catch (error) {
+        console.log('Erreur lors de la mise à jour du menu contextuel:', error);
+    }
+}
+
+// Initialiser le menu pour l'onglet actif immédiatement
+async function initializeMenuForCurrentTab() {
+    try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0]) {
+            await updateContextMenuForTab(tabs[0].id);
+        }
+    } catch (error) {
+        console.log('Erreur lors de l\'initialisation du menu:', error);
+    }
 }
 
 // Variables pour stocker les informations de l'élément cible
