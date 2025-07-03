@@ -47,6 +47,27 @@ Cette fonctionnalité vous permet d'automatiser la sélection de l'option "Commu
 - **Gestion des lignes déjà remplies** : Ignore automatiquement les lignes déjà traitées
 - **Délai optimisé** : 800ms entre chaque ligne pour une vitesse idéale
 
+### 🔄 Rotation d'image pour RentreeDiscount (NOUVEAU)
+Cette fonctionnalité permet de faire pivoter directement les images des listes de fournitures dans le navigateur sur le site rentreediscount.com.
+
+#### Comment utiliser :
+
+1. **Sur les pages d'images de rentreediscount.com :**
+   - Ouvrez une pièce jointe qui s'affiche dans une URL comme : `https://www.rentreediscount.com/publicmedia/original/167/483/852/fr/...jpg`
+   - Faites un **clic droit** directement sur l'image
+   - Sélectionnez **"🔄 Faire pivoter l'image"** dans le menu contextuel
+
+2. **Rotation intelligente :**
+   - L'image pivote de **90° dans le sens horaire** à chaque clic
+   - **Pas de rognage** : Les dimensions s'adaptent automatiquement
+   - **Animation fluide** : Transition en douceur de 0.3 secondes
+   - **Cycle complet** : 0° → 90° → 180° → 270° → 0°...
+
+3. **Caractéristiques :**
+   - **Pas de sauvegarde** : La rotation ne persiste pas (recharge = remise à zéro)
+   - **Spécifique au site** : Fonctionne uniquement sur rentreediscount.com
+   - **Respect des dimensions** : L'image reste entièrement visible lors de la rotation
+
 ### 🎯 Remplissage automatique par pattern (NOUVEAU)
 Cette fonctionnalité permet de remplir automatiquement toute une liste en propageant intelligemment les matières déjà sélectionnées.
 

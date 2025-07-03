@@ -75,6 +75,16 @@ function createCrealisteContextMenu() {
     });
 }
 
+// Créer les menus contextuels spécifiques à rentreediscount.com
+function createRentreeDiscountContextMenu() {
+    chrome.contextMenus.create({
+        id: "rotateImage",
+        title: "🔄 Faire pivoter l'image",
+        contexts: ["image"],
+        documentUrlPatterns: ["*://www.rentreediscount.com/*"]
+    });
+}
+
 // Fonction pour mettre à jour les menus contextuels selon l'URL
 async function updateContextMenuForTab(tabId) {
     try {
@@ -84,7 +94,9 @@ async function updateContextMenuForTab(tabId) {
             tab.url.includes('www.crealiste.com')
         );
         
-        console.log(`Mise à jour menu contextuel pour: ${tab.url} - Crealiste: ${isCrealiste}`);
+        const isRentreeDiscount = tab.url && tab.url.includes('www.rentreediscount.com');
+        
+        console.log(`Mise à jour menu contextuel pour: ${tab.url} - Crealiste: ${isCrealiste} - RentreeDiscount: ${isRentreeDiscount}`);
         
         // Supprimer tous les menus existants
         chrome.contextMenus.removeAll(() => {
@@ -92,8 +104,12 @@ async function updateContextMenuForTab(tabId) {
                 // Créer les menus spécifiques à crealiste
                 createCrealisteContextMenu();
                 console.log('Menus contextuels TempoList activés pour crealiste.com');
+            } else if (isRentreeDiscount) {
+                // Créer les menus spécifiques à rentreediscount
+                createRentreeDiscountContextMenu();
+                console.log('Menu de rotation d\'image activé pour rentreediscount.com');
             } else {
-                console.log('Menus contextuels TempoList désactivés (pas sur crealiste.com)');
+                console.log('Menus contextuels TempoList désactivés');
             }
         });
     } catch (error) {
@@ -138,6 +154,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         chrome.tabs.sendMessage(tab.id, {
             action: 'startPatternFill',
             element: currentElementInfo || { tagName: 'SELECT' }
+        });
+    } else if (info.menuItemId === "rotateImage") {
+        // Faire pivoter l'image sur rentreediscount.com
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'rotateImage',
+            srcUrl: info.srcUrl
         });
     }
 });

@@ -60,6 +60,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'stopAutomation') {
         stopAutomation();
         sendResponse({ success: true });
+    } else if (request.action === 'rotateImage') {
+        rotateImage(request.srcUrl);
+        sendResponse({ success: true });
     }
 });
 
@@ -1153,4 +1156,121 @@ async function setSubjectValue(select, subjectText) {
 window.tempoListTestPattern = function() {
     logAction('🧪 Test du remplissage automatique');
     startPatternFill({ tagName: 'SELECT' });
-}; 
+};
+
+// === ROTATION D'IMAGE POUR RENTREEDISCOUNT.COM ===
+
+// Map pour stocker les rotations des images (sans persistance)
+const imageRotations = new Map();
+
+// Fonction pour faire pivoter une image
+function rotateImage(srcUrl) {
+    // Vérifier qu'on est bien sur rentreediscount.com
+    if (!window.location.hostname.includes('rentreediscount.com')) {
+        console.log('[TempoList] Rotation d\'image uniquement disponible sur rentreediscount.com');
+        return;
+    }
+    
+    console.log('[TempoList] Rotation de l\'image:', srcUrl);
+    
+    // Trouver l'image sur la page
+    const images = document.querySelectorAll('img');
+    let targetImage = null;
+    
+    for (const img of images) {
+        if (img.src === srcUrl) {
+            targetImage = img;
+            break;
+        }
+    }
+    
+    if (!targetImage) {
+        console.log('[TempoList] Image non trouvée sur la page');
+        return;
+    }
+    
+    // Obtenir la rotation actuelle ou initialiser à 0
+    let currentRotation = imageRotations.get(srcUrl) || 0;
+    
+    // Incrémenter la rotation de 90 degrés
+    currentRotation += 90;
+    if (currentRotation >= 360) {
+        currentRotation = 0;
+    }
+    
+    // Sauvegarder la nouvelle rotation
+    imageRotations.set(srcUrl, currentRotation);
+    
+    // Appliquer la rotation avec une transformation CSS
+    applyImageRotation(targetImage, currentRotation);
+    
+    console.log(`[TempoList] Image pivotée de ${currentRotation} degrés`);
+}
+
+// Fonction pour appliquer la rotation à une image
+function applyImageRotation(img, rotation) {
+    // Sauvegarder les propriétés originales si ce n'est pas déjà fait
+    if (!img.dataset.originalData) {
+        const computedStyle = window.getComputedStyle(img);
+        const rect = img.getBoundingClientRect();
+        
+        img.dataset.originalData = JSON.stringify({
+            width: computedStyle.width,
+            height: computedStyle.height,
+            maxWidth: computedStyle.maxWidth,
+            maxHeight: computedStyle.maxHeight,
+            objectFit: computedStyle.objectFit,
+            actualWidth: rect.width,
+            actualHeight: rect.height
+        });
+    }
+    
+    const originalData = JSON.parse(img.dataset.originalData);
+    
+    // Appliquer la transformation CSS
+    img.style.transform = `rotate(${rotation}deg)`;
+    img.style.transformOrigin = 'center center';
+    img.style.transition = 'transform 0.3s ease-in-out';
+    
+    // Gestion intelligente des dimensions selon la rotation
+    if (rotation === 90 || rotation === 270) {
+        // Pour les rotations verticales, adapter les dimensions pour éviter le débordement
+        const containerWidth = img.parentElement ? img.parentElement.clientWidth : window.innerWidth;
+        const containerHeight = img.parentElement ? img.parentElement.clientHeight : window.innerHeight;
+        
+        // Calculer les nouvelles dimensions maximales en tenant compte de la rotation
+        const maxDimension = Math.min(containerWidth * 0.9, containerHeight * 0.9);
+        
+        // Appliquer des contraintes pour éviter le débordement
+        img.style.maxWidth = `${maxDimension}px`;
+        img.style.maxHeight = `${maxDimension}px`;
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+        img.style.objectFit = 'contain';
+        
+        // S'assurer que l'image reste dans les limites du viewport
+        img.style.maxWidth = `min(${maxDimension}px, 90vw)`;
+        img.style.maxHeight = `min(${maxDimension}px, 90vh)`;
+        
+    } else {
+        // Pour 0° et 180°, restaurer les dimensions originales
+        img.style.width = originalData.width;
+        img.style.height = originalData.height;
+        img.style.maxWidth = originalData.maxWidth;
+        img.style.maxHeight = originalData.maxHeight;
+        img.style.objectFit = originalData.objectFit;
+    }
+    
+    // Ajouter une classe pour identifier les images pivotées
+    img.classList.add('tempolist-rotated');
+    img.dataset.rotation = rotation;
+    
+    console.log(`[TempoList] Image dimensions ajustées pour rotation ${rotation}°`);
+}
+
+// Nettoyer les rotations quand on quitte la page (optionnel)
+window.addEventListener('beforeunload', () => {
+    imageRotations.clear();
+});
+
+console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rentreediscount.com'); 
