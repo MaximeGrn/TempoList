@@ -1,4 +1,23 @@
 // Script de contenu pour l'automatisation TempoList
+
+// Vérifier que l'extension est toujours valide
+function checkExtensionValidity() {
+    try {
+        return chrome && chrome.runtime && chrome.runtime.id;
+    } catch (error) {
+        console.log('[TempoList] Extension context invalidated, script will not run');
+        return false;
+    }
+}
+
+// Si l'extension n'est pas valide, arrêter l'exécution
+if (!checkExtensionValidity()) {
+    console.log('[TempoList] Extension context invalidated, stopping content script');
+    // Ne pas continuer l'exécution du script
+} else {
+    console.log('[TempoList] Extension context valid, content script starting');
+}
+
 let isAutomationRunning = false;
 let automationInterval = null;
 let currentTargetElement = null;
@@ -790,45 +809,62 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Écouter le clic droit pour capturer l'élément
-let lastRightClickedElement = null;
+// Fonction utilitaire pour envoyer des messages de manière sécurisée
+function safeSendMessage(message, callback) {
+    try {
+        // Vérifier que l'extension est toujours valide
+        if (!checkExtensionValidity()) {
+            console.log('[TempoList] Extension context invalidated, cannot send message');
+            return;
+        }
+        
+        chrome.runtime.sendMessage(message, (response) => {
+            if (chrome.runtime.lastError) {
+                console.log('[TempoList] Extension context invalidated, ignoring error:', chrome.runtime.lastError.message);
+                return;
+            }
+            if (callback) callback(response);
+        });
+    } catch (error) {
+        console.log('[TempoList] Extension context error:', error.message);
+    }
+}
 
-document.addEventListener('contextmenu', (event) => {
-    lastRightClickedElement = event.target;
+// Écouter les clics droits sur les éléments
+document.addEventListener('contextmenu', (e) => {
+    const target = e.target;
     
-    // Si on clique sur un select ou un élément dans un select, utiliser le select
-    let targetElement = event.target;
-    if (targetElement.tagName.toLowerCase() !== 'select') {
-        const parentSelect = targetElement.closest('select');
-        if (parentSelect) {
-            targetElement = parentSelect;
+    // Enregistrer les informations de l'élément cliqué
+    const elementInfo = {
+        tagName: target.tagName,
+        id: target.id,
+        className: target.className,
+        type: target.type,
+        rect: target.getBoundingClientRect()
+    };
+    
+    // Si c'est dans AG-Grid, ajouter les informations spécifiques
+    const agRow = target.closest('.ag-row');
+    if (agRow) {
+        elementInfo.rowIndex = agRow.getAttribute('row-index');
+        
+        const agCell = target.closest('.ag-cell');
+        if (agCell) {
+            elementInfo.colId = agCell.getAttribute('col-id');
         }
     }
     
-    // Stocker les informations de l'élément pour le background script
-    const elementInfo = {
-        id: targetElement.id,
-        className: targetElement.className,
-        tagName: targetElement.tagName,
-        type: targetElement.type,
-        rect: targetElement.getBoundingClientRect(),
-        // Ajouter des informations sur la position dans la grille
-        rowIndex: targetElement.closest('.ag-row')?.getAttribute('row-index') || null,
-        colId: targetElement.closest('[col-id]')?.getAttribute('col-id') || null
-    };
-    
-    console.log('[TempoList] Clic droit détecté sur:', {
-        element: targetElement,
+    logAction(`Clic droit détecté sur: ${target.tagName}`, 'info', false);
+    logAction(`Element info: ${JSON.stringify({
         tagName: elementInfo.tagName,
-        type: elementInfo.type,
         id: elementInfo.id,
         className: elementInfo.className,
         rowIndex: elementInfo.rowIndex,
         colId: elementInfo.colId
-    });
+    })}`);
     
-    // Envoyer les informations au background script
-    chrome.runtime.sendMessage({
+    // Envoyer les informations au background script de manière sécurisée
+    safeSendMessage({
         action: 'elementRightClicked',
         elementInfo: elementInfo
     });
