@@ -45,10 +45,12 @@ function setupEventListeners() {
 
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
-    const result = await chrome.storage.local.get(['teams', 'dailyTarget']);
+    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'showAssistColumn']);
     
     teams = result.teams || [];
     dailyTarget = result.dailyTarget || 40;
+    // Charger l'état de la case à cocher
+    document.getElementById('showAssistColumn').checked = !!result.showAssistColumn;
 }
 
 // Mettre à jour l'input de l'objectif
@@ -273,18 +275,10 @@ function updateDailyTarget() {
 
 // Sauvegarder tous les paramètres
 async function saveAllSettings() {
-    try {
-        await chrome.storage.local.set({
-            teams: teams,
-            dailyTarget: dailyTarget
-        });
-        
-        showMessage('Paramètres sauvegardés avec succès !', 'success');
-        
-    } catch (error) {
-        console.error('Erreur lors de la sauvegarde des paramètres:', error);
-        showMessage('Erreur lors de la sauvegarde des paramètres.', 'error');
-    }
+    dailyTarget = parseInt(document.getElementById('dailyTarget').value, 10) || 40;
+    const showAssistColumn = document.getElementById('showAssistColumn').checked;
+    await chrome.storage.local.set({ dailyTarget, showAssistColumn });
+    showMessage('Paramètres sauvegardés !', 'success');
 }
 
 // Afficher un message

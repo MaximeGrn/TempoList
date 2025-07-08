@@ -1274,3 +1274,62 @@ window.addEventListener('beforeunload', () => {
 });
 
 console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rentreediscount.com'); 
+
+// === COLONNE ASSIST DYNAMIQUE ===
+(async function injectAssistColumnIfNeeded() {
+    if (document.readyState === 'loading') {
+        await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+    }
+    const result = await new Promise(resolve => {
+        try {
+            chrome.storage.local.get(['showAssistColumn'], resolve);
+        } catch (e) { resolve({ showAssistColumn: false }); }
+    });
+    if (!result.showAssistColumn) {
+        removeAssistColumn();
+        return;
+    }
+    // Injecter la colonne Assist dans le header, juste après la colonne Image
+    const headerRow = document.querySelector('.ag-header-row');
+    if (headerRow && !headerRow.querySelector('[col-id="assist"]')) {
+        const imageCell = headerRow.querySelector('[col-id="image"]');
+        if (imageCell) {
+            const assistCell = imageCell.cloneNode(true);
+            assistCell.setAttribute('col-id', 'assist');
+            assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
+            assistCell.querySelector('.ag-header-cell-text').textContent = 'Assist';
+            assistCell.style.left = '';
+            assistCell.classList.remove('ag-column-first');
+            // Insérer APRÈS la colonne image (donc avant le sibling suivant)
+            headerRow.insertBefore(assistCell, imageCell.nextElementSibling);
+        }
+    }
+    // Pour chaque ligne, injecter la cellule Assist après la cellule Image
+    document.querySelectorAll('.ag-row').forEach(row => {
+        const imageCell = row.querySelector('[col-id="image"]');
+        if (imageCell && !row.querySelector('[col-id="assist"]')) {
+            const assistCell = imageCell.cloneNode(true);
+            assistCell.setAttribute('col-id', 'assist');
+            assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
+            assistCell.style.left = '';
+            assistCell.classList.remove('ag-column-first');
+            const quantityCell = row.querySelector('[col-id="quantity"]');
+            let quantityValue = '';
+            if (quantityCell) {
+                const p = quantityCell.querySelector('p.inputValuProduct');
+                quantityValue = p ? p.textContent : quantityCell.textContent;
+                if (!quantityValue || quantityValue.trim() === '') quantityValue = 'erreur';
+            } else {
+                quantityValue = 'erreur';
+            }
+            assistCell.innerHTML = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span></div>`;
+            // Insérer APRÈS la colonne image (donc avant le sibling suivant)
+            row.insertBefore(assistCell, imageCell.nextElementSibling);
+        }
+    });
+})();
+
+function removeAssistColumn() {
+    document.querySelectorAll('.ag-header-row [col-id="assist"]').forEach(cell => cell.remove());
+    document.querySelectorAll('.ag-row [col-id="assist"]').forEach(cell => cell.remove());
+} 
