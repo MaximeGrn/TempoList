@@ -1289,29 +1289,46 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
         removeAssistColumn();
         return;
     }
-    // Injecter la colonne Assist dans le header, juste après la colonne Image
+    // --- HEADER ---
     const headerRow = document.querySelector('.ag-header-row');
     if (headerRow && !headerRow.querySelector('[col-id="assist"]')) {
         const imageCell = headerRow.querySelector('[col-id="image"]');
-        if (imageCell) {
+        const codeRefCell = headerRow.querySelector('[col-id="codeRef"]');
+        if (imageCell && codeRefCell) {
             const assistCell = imageCell.cloneNode(true);
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
             assistCell.querySelector('.ag-header-cell-text').textContent = 'Assist';
-            assistCell.style.left = '';
+            // Copier la largeur de la colonne image
+            assistCell.style.width = imageCell.style.width;
+            // Placer la colonne Assist à la position de codeRef
+            assistCell.style.left = codeRefCell.style.left;
             assistCell.classList.remove('ag-column-first');
-            // Insérer APRÈS la colonne image (donc avant le sibling suivant)
-            headerRow.insertBefore(assistCell, imageCell.nextElementSibling);
+            // Insérer AVANT la colonne codeRef
+            headerRow.insertBefore(assistCell, codeRefCell);
+            // Décaler la colonne codeRef et toutes les suivantes
+            let assistWidth = assistCell.offsetWidth || parseInt(assistCell.style.width) || 70;
+            let found = false;
+            headerRow.querySelectorAll('.ag-header-cell').forEach(cell => {
+                if (cell === assistCell) found = true;
+                if (found && cell !== assistCell) {
+                    // Décaler la colonne de la largeur de Assist
+                    let left = parseInt(cell.style.left || '0');
+                    cell.style.left = (left + assistWidth) + 'px';
+                }
+            });
         }
     }
-    // Pour chaque ligne, injecter la cellule Assist après la cellule Image
+    // --- LIGNES ---
     document.querySelectorAll('.ag-row').forEach(row => {
         const imageCell = row.querySelector('[col-id="image"]');
-        if (imageCell && !row.querySelector('[col-id="assist"]')) {
+        const codeRefCell = row.querySelector('[col-id="codeRef"]');
+        if (imageCell && codeRefCell && !row.querySelector('[col-id="assist"]')) {
             const assistCell = imageCell.cloneNode(true);
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
-            assistCell.style.left = '';
+            assistCell.style.width = imageCell.style.width;
+            assistCell.style.left = codeRefCell.style.left;
             assistCell.classList.remove('ag-column-first');
             const quantityCell = row.querySelector('[col-id="quantity"]');
             let quantityValue = '';
@@ -1323,8 +1340,18 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
                 quantityValue = 'erreur';
             }
             assistCell.innerHTML = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span></div>`;
-            // Insérer APRÈS la colonne image (donc avant le sibling suivant)
-            row.insertBefore(assistCell, imageCell.nextElementSibling);
+            // Insérer AVANT la colonne codeRef
+            row.insertBefore(assistCell, codeRefCell);
+            // Décaler la colonne codeRef et toutes les suivantes
+            let assistWidth = assistCell.offsetWidth || parseInt(assistCell.style.width) || 70;
+            let found = false;
+            row.querySelectorAll('.ag-cell').forEach(cell => {
+                if (cell === assistCell) found = true;
+                if (found && cell !== assistCell) {
+                    let left = parseInt(cell.style.left || '0');
+                    cell.style.left = (left + assistWidth) + 'px';
+                }
+            });
         }
     });
 })();
