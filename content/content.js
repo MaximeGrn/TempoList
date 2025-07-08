@@ -1276,6 +1276,69 @@ window.addEventListener('beforeunload', () => {
 console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rentreediscount.com'); 
 
 // === COLONNE ASSIST DYNAMIQUE ===
+// Fonction utilitaire pour extraire la couleur depuis un texte
+function extractColorFromText(text) {
+    if (!text) return null;
+    // Liste des couleurs françaises courantes (ajoute-en si besoin)
+    const colorMap = {
+        'noir': '#000',
+        'blanc': '#fff',
+        'rouge': '#e53935',
+        'bleu': '#1e88e5',
+        'vert': '#43a047',
+        'jaune': '#fbc02d',
+        'violet': '#8e24aa',
+        'rose': '#e91e63',
+        'orange': '#fb8c00',
+        'gris': '#757575',
+        'marron': '#795548',
+        'beige': '#f5f5dc',
+        'turquoise': '#1de9b6',
+        'doré': '#ffd700',
+        'argent': '#c0c0c0',
+        'bordeaux': '#800000',
+        'fuchsia': '#ff00ff',
+        'anis': '#bfff00',
+        'cyan': '#00bcd4',
+        'lilas': '#c8a2c8',
+        'saumon': '#fa8072',
+        'cuivre': '#b87333',
+        'kaki': '#bdb76b',
+        'ocre': '#cc7722',
+        'prune': '#8e4585',
+        'aubergine': '#580f41',
+        'sable': '#f4a460',
+        'ivoire': '#fffff0',
+        'corail': '#ff7f50',
+        'bleu marine': '#001f3f',
+        'bleu ciel': '#87ceeb',
+        'bleu clair': '#add8e6',
+        'bleu foncé': '#0d47a1',
+        'vert clair': '#90ee90',
+        'vert foncé': '#006400',
+        'jaune fluo': '#e6fb04',
+        'fluo': '#e6fb04',
+    };
+    // Recherche de la couleur dans le texte (priorité aux couleurs composées)
+    const colorNames = Object.keys(colorMap).sort((a, b) => b.length - a.length);
+    const lowerText = text.toLowerCase();
+    for (const color of colorNames) {
+        if (lowerText.includes(color)) {
+            return { name: color, hex: colorMap[color] };
+        }
+    }
+    return null;
+}
+
+// Fonction utilitaire pour générer le style arc-en-ciel pour le mot "Vives"
+function getRainbowStyle() {
+    return 'background: linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet);\
+    -webkit-background-clip: text;\
+    -webkit-text-fill-color: transparent;\
+    background-clip: text;\
+    text-fill-color: transparent; font-weight: bold;';
+}
+
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
         await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
@@ -1299,20 +1362,18 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
             assistCell.querySelector('.ag-header-cell-text').textContent = 'Assist';
-            // Copier la largeur de la colonne image
-            assistCell.style.width = imageCell.style.width;
-            // Placer la colonne Assist à la position de codeRef
+            // Largeur personnalisée pour Assist
+            assistCell.style.width = '120px';
+            assistCell.style.minWidth = '120px';
+            assistCell.style.maxWidth = '120px';
             assistCell.style.left = codeRefCell.style.left;
             assistCell.classList.remove('ag-column-first');
-            // Insérer AVANT la colonne codeRef
             headerRow.insertBefore(assistCell, codeRefCell);
-            // Décaler la colonne codeRef et toutes les suivantes
-            let assistWidth = assistCell.offsetWidth || parseInt(assistCell.style.width) || 70;
+            let assistWidth = 120; // Largeur fixe
             let found = false;
             headerRow.querySelectorAll('.ag-header-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
                 if (found && cell !== assistCell) {
-                    // Décaler la colonne de la largeur de Assist
                     let left = parseInt(cell.style.left || '0');
                     cell.style.left = (left + assistWidth) + 'px';
                 }
@@ -1327,7 +1388,9 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
             const assistCell = imageCell.cloneNode(true);
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
-            assistCell.style.width = imageCell.style.width;
+            assistCell.style.width = '120px';
+            assistCell.style.minWidth = '120px';
+            assistCell.style.maxWidth = '120px';
             assistCell.style.left = codeRefCell.style.left;
             assistCell.classList.remove('ag-column-first');
             const quantityCell = row.querySelector('[col-id="quantity"]');
@@ -1339,11 +1402,31 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
             } else {
                 quantityValue = 'erreur';
             }
-            assistCell.innerHTML = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span></div>`;
-            // Insérer AVANT la colonne codeRef
+            // Extraire la couleur depuis la colonne Nom
+            let colorValue = '';
+            let colorHex = '';
+            const nomCell = row.querySelector('[col-id="nom"]');
+            if (nomCell) {
+                const nomText = nomCell.textContent;
+                const colorObj = extractColorFromText(nomText);
+                if (colorObj) {
+                    colorValue = colorObj.name.charAt(0).toUpperCase() + colorObj.name.slice(1);
+                    colorHex = colorObj.hex;
+                }
+            }
+            let assistHtml = '';
+            if (colorValue && colorHex) {
+                if (colorValue.toLowerCase() === 'vives') {
+                    assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span> <span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"${getRainbowStyle()}\">Vives</span></div>`;
+                } else {
+                    assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span> <span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;color: ${colorHex};text-shadow: 0 1px 1px #fff2;\">${colorValue}</span></div>`;
+                }
+            } else {
+                assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span></div>`;
+            }
+            assistCell.innerHTML = assistHtml;
             row.insertBefore(assistCell, codeRefCell);
-            // Décaler la colonne codeRef et toutes les suivantes
-            let assistWidth = assistCell.offsetWidth || parseInt(assistCell.style.width) || 70;
+            let assistWidth = 120;
             let found = false;
             row.querySelectorAll('.ag-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
@@ -1355,6 +1438,17 @@ console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rent
         }
     });
 })();
+
+// Ajoute "vives" à la liste des couleurs détectables
+const oldExtractColorFromText = extractColorFromText;
+extractColorFromText = function(text) {
+    if (!text) return null;
+    const vivesRegex = /vives?/i;
+    if (vivesRegex.test(text)) {
+        return { name: 'vives', hex: 'rainbow' };
+    }
+    return oldExtractColorFromText(text);
+};
 
 function removeAssistColumn() {
     document.querySelectorAll('.ag-header-row [col-id="assist"]').forEach(cell => cell.remove());
