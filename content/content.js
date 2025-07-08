@@ -1291,6 +1291,7 @@ function extractColorFromText(text) {
         'rose': '#e91e63',
         'orange': '#fb8c00',
         'gris': '#757575',
+        'incolore': '#bfbfbf',
         'marron': '#795548',
         'beige': '#f5f5dc',
         'turquoise': '#1de9b6',
@@ -1338,6 +1339,18 @@ function getRainbowStyle() {
     background-clip: text;\
     text-fill-color: transparent; font-weight: bold;';
 }
+
+// Liste des références à exclure pour l'affichage de la couleur dans Assist
+const excludedRefs = [
+    'JPC570015',
+    'CLA1979HOC-2',
+    'safb710000',
+    'CASLC401LVBUWAEP',
+    'BRECRIET70102',
+    'P2158700',
+    '1545500',
+    // Ajoute ici d'autres références à exclure
+];
 
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
@@ -1402,11 +1415,22 @@ function getRainbowStyle() {
             } else {
                 quantityValue = 'erreur';
             }
+            // Récupérer la référence de la ligne
+            let refValue = '';
+            const refCell = row.querySelector('[col-id="codeRef"]');
+            if (refCell) {
+                refValue = refCell.textContent.trim();
+            }
             // Extraire la couleur depuis la colonne Nom
             let colorValue = '';
             let colorHex = '';
+            let showColor = true;
+            // Si la référence est dans la liste d'exclusion, on n'affiche pas la couleur
+            if (excludedRefs.includes(refValue)) {
+                showColor = false;
+            }
             const nomCell = row.querySelector('[col-id="nom"]');
-            if (nomCell) {
+            if (nomCell && showColor) {
                 const nomText = nomCell.textContent;
                 const colorObj = extractColorFromText(nomText);
                 if (colorObj) {
@@ -1415,7 +1439,7 @@ function getRainbowStyle() {
                 }
             }
             let assistHtml = '';
-            if (colorValue && colorHex) {
+            if (colorValue && colorHex && showColor) {
                 if (colorValue.toLowerCase() === 'vives') {
                     assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span> <span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"${getRainbowStyle()}\">Vives</span></div>`;
                 } else {
