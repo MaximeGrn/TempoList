@@ -1364,7 +1364,25 @@ const exclureRefsTaille = [
     '3212199',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
+// Références à exclure pour Simple/Double
+const exclureRefsSimpleDouble = [
+    // Ajoute ici d'autres références à exclure pour Simple/Double
+];
 // =====================
+
+// Fonction utilitaire pour extraire Simple/Double depuis un texte
+function extractSimpleDoubleFromText(text) {
+    if (!text) return null;
+    // On cherche "simple(s)" ou "double(s)" (insensible à la casse)
+    const regex = /(simple|simples|double|doubles)/i;
+    const match = text.match(regex);
+    if (match) {
+        const val = match[0].toLowerCase();
+        if (val.startsWith('double')) return 'Doubles';
+        if (val.startsWith('simple')) return 'Simples';
+    }
+    return null;
+}
 
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
@@ -1435,9 +1453,16 @@ const exclureRefsTaille = [
             if (refCell) {
                 refValue = refCell.textContent.trim();
             }
+            const nomCell = row.querySelector('[col-id="nom"]');
+            // Extraire Simple/Double (sauf si exclue)
+            let simpleDoubleValue = '';
+            if (nomCell && exclureRefsSimpleDouble.indexOf(refValue) === -1) {
+                const nomText = nomCell.textContent;
+                const sd = extractSimpleDoubleFromText(nomText);
+                if (sd) simpleDoubleValue = sd;
+            }
             // Extraire la taille depuis la colonne Nom (sauf si exclue)
             let tailleValue = '';
-            const nomCell = row.querySelector('[col-id="nom"]');
             if (nomCell && exclureRefsTaille.indexOf(refValue) === -1) {
                 const nomText = nomCell.textContent;
                 const taille = extractTailleFromText(nomText);
@@ -1460,9 +1485,12 @@ const exclureRefsTaille = [
                     colorHex = colorObj.hex;
                 }
             }
-            // Générer le HTML de la colonne Assist
+            // Générer le HTML de la colonne Assist dans l'ordre demandé
             let assistHtml = '';
             let parts = [`<span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span>`];
+            if (simpleDoubleValue) {
+                parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${simpleDoubleValue}</span>`);
+            }
             if (tailleValue) {
                 parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${tailleValue}</span>`);
             }
