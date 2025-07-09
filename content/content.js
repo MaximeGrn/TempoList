@@ -1283,12 +1283,12 @@ function extractColorFromText(text) {
     const colorMap = {
         'noir': '#000',
         'blanc': '#fff',
+        'rose': '#e91e63',
         'rouge': '#e53935',
         'bleu': '#1e88e5',
         'vert': '#43a047',
         'jaune': '#fbc02d',
         'violet': '#8e24aa',
-        'rose': '#e91e63',
         'orange': '#fb8c00',
         'gris': '#757575',
         'incolore': '#bfbfbf',
@@ -1361,6 +1361,9 @@ const exclureRefsCouleur = [
     'EXA184072E',
     '0337900',
     'ECR07-0005',
+    'EXA184071E',
+    'EXA184073E',
+    '9471605',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1368,6 +1371,21 @@ const exclureRefsCouleur = [
 const exclureRefsTaille = [
     '3212199',
     '3233907',
+    '3234103',
+    '3234001',
+    '3346301',
+    '3346701',
+    '3346903',
+    '3344001',
+    'EXA8539E',
+    '3344203',
+    '3342701',
+    '3342903',
+    'EXA85102E',
+    'EXA85105E',
+    'CLA03-0013',
+    '3345202',
+    '3345501',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
