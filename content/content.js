@@ -1351,6 +1351,9 @@ const excludedRefs = [
     '1545500',
     'MAP244621',
     '3096800',
+    'CLA1979HOC',
+    'MAP244180',
+    'CMPHT1240BVN',
     // Ajoute ici d'autres références à exclure
 ];
 
