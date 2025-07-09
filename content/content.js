@@ -1308,7 +1308,6 @@ function extractColorFromText(text) {
         'ocre': '#cc7722',
         'prune': '#8e4585',
         'aubergine': '#580f41',
-        'sable': '#f4a460',
         'ivoire': '#fffff0',
         'corail': '#ff7f50',
         'bleu marine': '#001f3f',
@@ -1368,6 +1367,7 @@ const exclureRefsCouleur = [
 // Références à exclure pour la taille
 const exclureRefsTaille = [
     '3212199',
+    '3233907',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1400,6 +1400,20 @@ function extractSimpleDoubleFromText(text) {
 // Fonction utilitaire pour extraire le détail fourniture
 function extractDetailFournitureFromText(text) {
     if (!text) return null;
+    // 1. Intercalaires : 6 touches, 12 touches
+    const regexInter = /(6|12)\s*touches?/i;
+    if (/intercalaire/i.test(text)) {
+        const matchInter = text.match(regexInter);
+        if (matchInter) {
+            return matchInter[1] + ' inter';
+        }
+    }
+    // 2. Grammage : 8g, 20g, 21g, 40g, 150g, 160g, 180g, 224g, 250g
+    const regexGrammage = /\b(8|20|21|40|150|160|180|224|250)\s*[gG]\b/;
+    const matchGrammage = text.match(regexGrammage);
+    if (matchGrammage) {
+        return matchGrammage[1] + 'g';
+    }
     // Détail diamètre de mine : 0,5 mm, 0,7 mm, 0.5mm, 0.7mm, etc.
     const regexMineDiam = /0[\.,]([57])\s*mm/i;
     const matchMineDiam = text.match(regexMineDiam);
@@ -1586,14 +1600,14 @@ extractColorFromText = function(text) {
 function extractTailleFromText(text) {
     if (!text) return null;
     // Liste des tailles à détecter (tu peux en ajouter)
-    const tailles = ['24x32', '17x22', 'A4', 'A5'];
+    const tailles = ['24x32', '17x22', 'A4', 'A5', '11x17'];
     // Accepte aussi les variantes avec X majuscule
     const regexTailles = new RegExp(tailles.map(t => t.replace('x', '[xX]')).join('|'), 'i');
     const match = text.match(regexTailles);
     if (match) {
         let val = match[0];
-        // Si c'est une taille du type 24x32 ou 17x22, normalise le x en minuscule
-        if (/^\d{2}[xX]\d{2}$/.test(val)) {
+        // Si c'est une taille du type 24x32, 17x22, 11x17, normalise le x en minuscule
+        if (/^(\d{2}|11)[xX]\d{2}$/.test(val)) {
             return val.replace(/[xX]/, 'x');
         }
         // Pour A4/A5, laisse en majuscule
