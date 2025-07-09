@@ -1361,6 +1361,7 @@ const exclureRefsCouleur = [
     '5497200',
     'EXA184072E',
     '0337900',
+    'ECR07-0005',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1371,6 +1372,7 @@ const exclureRefsTaille = [
 ];
 // Références à exclure pour Simple/Double
 const exclureRefsSimpleDouble = [
+    'P5625000',
     // Ajoute ici d'autres références à exclure pour Simple/Double
 ];
 // Références à exclure pour Détail Fourniture
@@ -1398,6 +1400,13 @@ function extractSimpleDoubleFromText(text) {
 // Fonction utilitaire pour extraire le détail fourniture
 function extractDetailFournitureFromText(text) {
     if (!text) return null;
+    // Détail diamètre de mine : 0,5 mm, 0,7 mm, 0.5mm, 0.7mm, etc.
+    const regexMineDiam = /0[\.,]([57])\s*mm/i;
+    const matchMineDiam = text.match(regexMineDiam);
+    if (matchMineDiam) {
+        // Toujours afficher sous la forme "0,5 mm" ou "0,7 mm"
+        return `0,${matchMineDiam[1]} mm`;
+    }
     // Détail règle : 15cm, 20cm, 30cm, 40cm (avec ou sans espace, majuscule ou minuscule)
     const regexRegle = /([1-4]0|15|20|30)\s*cm/i;
     const matchRegle = text.match(regexRegle);
