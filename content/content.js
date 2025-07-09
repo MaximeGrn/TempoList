@@ -1349,6 +1349,8 @@ const excludedRefs = [
     'BRECRIET70102',
     'P2158700',
     '1545500',
+    'MAP244621',
+    '3096800',
     // Ajoute ici d'autres références à exclure
 ];
 
