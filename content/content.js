@@ -1340,8 +1340,11 @@ function getRainbowStyle() {
     text-fill-color: transparent; font-weight: bold;';
 }
 
-// Liste des références à exclure pour l'affichage de la couleur dans Assist
-const excludedRefs = [
+// =====================
+// Listes d'exclusion par fonctionnalité
+// =====================
+// Références à exclure pour la couleur
+const exclureRefsCouleur = [
     'JPC570015',
     'CLA1979HOC-2',
     'safb710000',
@@ -1354,8 +1357,14 @@ const excludedRefs = [
     'CLA1979HOC',
     'MAP244180',
     'CMPHT1240BVN',
-    // Ajoute ici d'autres références à exclure
+    // Ajoute ici d'autres références à exclure pour la couleur
 ];
+// Références à exclure pour la taille
+const exclureRefsTaille = [
+    '3212199',
+    // Ajoute ici d'autres références à exclure pour la taille
+];
+// =====================
 
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
@@ -1426,15 +1435,23 @@ const excludedRefs = [
             if (refCell) {
                 refValue = refCell.textContent.trim();
             }
-            // Extraire la couleur depuis la colonne Nom
+            // Extraire la taille depuis la colonne Nom (sauf si exclue)
+            let tailleValue = '';
+            const nomCell = row.querySelector('[col-id="nom"]');
+            if (nomCell && exclureRefsTaille.indexOf(refValue) === -1) {
+                const nomText = nomCell.textContent;
+                const taille = extractTailleFromText(nomText);
+                if (taille) {
+                    tailleValue = taille;
+                }
+            }
+            // Extraire la couleur depuis la colonne Nom (sauf si exclue)
             let colorValue = '';
             let colorHex = '';
             let showColor = true;
-            // Si la référence est dans la liste d'exclusion, on n'affiche pas la couleur
-            if (excludedRefs.includes(refValue)) {
+            if (exclureRefsCouleur.includes(refValue)) {
                 showColor = false;
             }
-            const nomCell = row.querySelector('[col-id="nom"]');
             if (nomCell && showColor) {
                 const nomText = nomCell.textContent;
                 const colorObj = extractColorFromText(nomText);
@@ -1443,16 +1460,20 @@ const excludedRefs = [
                     colorHex = colorObj.hex;
                 }
             }
+            // Générer le HTML de la colonne Assist
             let assistHtml = '';
+            let parts = [`<span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span>`];
+            if (tailleValue) {
+                parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${tailleValue}</span>`);
+            }
             if (colorValue && colorHex && showColor) {
                 if (colorValue.toLowerCase() === 'vives') {
-                    assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span> <span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"${getRainbowStyle()}\">Vives</span></div>`;
+                    parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"${getRainbowStyle()}\">Vives</span>`);
                 } else {
-                    assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span> <span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;color: ${colorHex};text-shadow: 0 1px 1px #fff2;\">${colorValue}</span></div>`;
+                    parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;color: ${colorHex};text-shadow: 0 1px 1px #fff2;\">${colorValue}</span>`);
                 }
-            } else {
-                assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;\"><span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span></div>`;
             }
+            assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\">${parts.join(' ')}</div>`;
             assistCell.innerHTML = assistHtml;
             row.insertBefore(assistCell, codeRefCell);
             let assistWidth = 120;
@@ -1478,6 +1499,26 @@ extractColorFromText = function(text) {
     }
     return oldExtractColorFromText(text);
 };
+
+// Fonction utilitaire pour extraire la taille depuis un texte
+function extractTailleFromText(text) {
+    if (!text) return null;
+    // Liste des tailles à détecter (tu peux en ajouter)
+    const tailles = ['24x32', '17x22', 'A4', 'A5'];
+    // Accepte aussi les variantes avec X majuscule
+    const regexTailles = new RegExp(tailles.map(t => t.replace('x', '[xX]')).join('|'), 'i');
+    const match = text.match(regexTailles);
+    if (match) {
+        let val = match[0];
+        // Si c'est une taille du type 24x32 ou 17x22, normalise le x en minuscule
+        if (/^\d{2}[xX]\d{2}$/.test(val)) {
+            return val.replace(/[xX]/, 'x');
+        }
+        // Pour A4/A5, laisse en majuscule
+        return val.toUpperCase();
+    }
+    return null;
+}
 
 function removeAssistColumn() {
     document.querySelectorAll('.ag-header-row [col-id="assist"]').forEach(cell => cell.remove());
