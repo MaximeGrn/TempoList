@@ -1299,6 +1299,7 @@ function extractColorFromText(text) {
         'argent': '#c0c0c0',
         'bordeaux': '#800000',
         'fuchsia': '#ff00ff',
+        'fushia': '#ff00ff',
         'anis': '#bfff00',
         'cyan': '#00bcd4',
         'lilas': '#c8a2c8',
@@ -1364,6 +1365,7 @@ const exclureRefsCouleur = [
     'EXA184071E',
     'EXA184073E',
     '9471605',
+    'CMPHT1076BNB',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1386,6 +1388,20 @@ const exclureRefsTaille = [
     'CLA03-0013',
     '3345202',
     '3345501',
+    '3233805',
+    '3345101',
+    '3345303',
+    '3234308',
+    'P3234204',
+    'P3072402',
+    '3345703',
+    '3343804',
+    '3099306',
+    '3099308',
+    'EXA8864E',
+    'EXA8866E',
+    'EXA8569E',
+    'CLA03-0011',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1397,8 +1413,13 @@ const exclureRefsSimpleDouble = [
 const exclureRefsDetailFourniture = [
     // Ajoute ici d'autres références à exclure pour le détail fourniture
 ];
+// Liste d'exclusion pour le nombre de pages/vues
+const exclureRefsNbPage = [
+    '2335600',
+    // Ajoute ici les références à exclure pour le nombre de pages/vues
+];
 // Largeur de la colonne Assist (modifiable facilement)
-const assistColumnWidth = 180; // en px
+const assistColumnWidth = 210; // en px
 // =====================
 
 // Fonction utilitaire pour extraire Simple/Double depuis un texte
@@ -1458,6 +1479,23 @@ function extractDetailFournitureFromText(text) {
     const matchCrayon = text.match(regexCrayon);
     if (matchCrayon) {
         return 'mine ' + matchCrayon[1].toUpperCase();
+    }
+    return null;
+}
+
+function extractNbPageOrVueFromText(text) {
+    if (!text) return null;
+    // Pages : 32P, 48P, 60P, 96P, 120P, 140P, 196P (insensible à la casse, avec ou sans espace)
+    const regexPage = /\b(32|48|60|96|120|140|196)\s*[pP]\b/;
+    const matchPage = text.match(regexPage);
+    if (matchPage) {
+        return matchPage[1] + 'p';
+    }
+    // Vues : 32 vues, 48 vues, etc.
+    const regexVue = /\b(20|30|40|50|60|80|100|120|140|160|200)\s*vues?\b/i;
+    const matchVue = text.match(regexVue);
+    if (matchVue) {
+        return matchVue[1] + ' vues';
     }
     return null;
 }
@@ -1568,6 +1606,11 @@ function extractDetailFournitureFromText(text) {
                     colorHex = colorObj.hex;
                 }
             }
+            // Extraire le nombre de pages/vues depuis la colonne Nom (sauf si exclue)
+            let nbPageOrVue = null;
+            if (!exclureRefsNbPage.includes(refValue)) {
+                nbPageOrVue = extractNbPageOrVueFromText(nomCell.textContent);
+            }
             // Générer le HTML de la colonne Assist dans l'ordre demandé
             let assistHtml = '';
             let parts = [`<span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span>`];
@@ -1579,6 +1622,9 @@ function extractDetailFournitureFromText(text) {
             }
             if (tailleValue) {
                 parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${tailleValue}</span>`);
+            }
+            if (nbPageOrVue) {
+                parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${nbPageOrVue}</span>`);
             }
             if (colorValue && colorHex && showColor) {
                 if (colorValue.toLowerCase() === 'vives') {
