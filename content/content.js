@@ -1357,6 +1357,11 @@ const exclureRefsCouleur = [
     'CLA1979HOC',
     'MAP244180',
     'CMPHT1240BVN',
+    '7755200',
+    '5497200',
+    'EXA184072E',
+    '0337900',
+
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
 // Références à exclure pour la taille
@@ -1368,6 +1373,12 @@ const exclureRefsTaille = [
 const exclureRefsSimpleDouble = [
     // Ajoute ici d'autres références à exclure pour Simple/Double
 ];
+// Références à exclure pour Détail Fourniture
+const exclureRefsDetailFourniture = [
+    // Ajoute ici d'autres références à exclure pour le détail fourniture
+];
+// Largeur de la colonne Assist (modifiable facilement)
+const assistColumnWidth = 180; // en px
 // =====================
 
 // Fonction utilitaire pour extraire Simple/Double depuis un texte
@@ -1380,6 +1391,32 @@ function extractSimpleDoubleFromText(text) {
         const val = match[0].toLowerCase();
         if (val.startsWith('double')) return 'Doubles';
         if (val.startsWith('simple')) return 'Simples';
+    }
+    return null;
+}
+
+// Fonction utilitaire pour extraire le détail fourniture
+function extractDetailFournitureFromText(text) {
+    if (!text) return null;
+    // Détail règle : 15cm, 20cm, 30cm, 40cm (avec ou sans espace, majuscule ou minuscule)
+    const regexRegle = /([1-4]0|15|20|30)\s*cm/i;
+    const matchRegle = text.match(regexRegle);
+    if (matchRegle) {
+        // Toujours afficher sans espace, minuscule pour cm
+        return matchRegle[0].replace(/\s+/g, '').replace(/CM/i, 'cm');
+    }
+    // Détail crayon : mine HB, B, 2B, 3B, 4B, 5B, 6B, 7B
+    const regexMine = /mine\s*(HB|[1-7]B|B)/i;
+    const matchMine = text.match(regexMine);
+    if (matchMine) {
+        // Affiche toujours "mine XX" (ex: mine HB, mine 2B)
+        return 'mine ' + matchMine[1].toUpperCase();
+    }
+    // Détail crayon sans le mot "mine" (ex: "CRAYON PAPIER 2B")
+    const regexCrayon = /crayon\s+papier.*?\b(HB|[1-7]B|B)\b/i;
+    const matchCrayon = text.match(regexCrayon);
+    if (matchCrayon) {
+        return 'mine ' + matchCrayon[1].toUpperCase();
     }
     return null;
 }
@@ -1433,9 +1470,7 @@ function extractSimpleDoubleFromText(text) {
             const assistCell = imageCell.cloneNode(true);
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
-            assistCell.style.width = '120px';
-            assistCell.style.minWidth = '120px';
-            assistCell.style.maxWidth = '120px';
+            assistCell.style.width = assistCell.style.minWidth = assistCell.style.maxWidth = assistColumnWidth + 'px';
             assistCell.style.left = codeRefCell.style.left;
             assistCell.classList.remove('ag-column-first');
             const quantityCell = row.querySelector('[col-id="quantity"]');
@@ -1460,6 +1495,13 @@ function extractSimpleDoubleFromText(text) {
                 const nomText = nomCell.textContent;
                 const sd = extractSimpleDoubleFromText(nomText);
                 if (sd) simpleDoubleValue = sd;
+            }
+            // Extraire Détail Fourniture (sauf si exclue)
+            let detailFournitureValue = '';
+            if (nomCell && exclureRefsDetailFourniture.indexOf(refValue) === -1) {
+                const nomText = nomCell.textContent;
+                const detail = extractDetailFournitureFromText(nomText);
+                if (detail) detailFournitureValue = detail;
             }
             // Extraire la taille depuis la colonne Nom (sauf si exclue)
             let tailleValue = '';
@@ -1491,6 +1533,9 @@ function extractSimpleDoubleFromText(text) {
             if (simpleDoubleValue) {
                 parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${simpleDoubleValue}</span>`);
             }
+            if (detailFournitureValue) {
+                parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${detailFournitureValue}</span>`);
+            }
             if (tailleValue) {
                 parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${tailleValue}</span>`);
             }
@@ -1504,7 +1549,7 @@ function extractSimpleDoubleFromText(text) {
             assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\">${parts.join(' ')}</div>`;
             assistCell.innerHTML = assistHtml;
             row.insertBefore(assistCell, codeRefCell);
-            let assistWidth = 120;
+            let assistWidth = assistColumnWidth;
             let found = false;
             row.querySelectorAll('.ag-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
