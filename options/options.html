@@ -27,12 +27,27 @@
         </div>
 
         <div class="section">
-            <h2>🛠️ Affichage</h2>
-            <div class="input-group">
-                <label for="showAssistColumn">
-                    <input type="checkbox" id="showAssistColumn">
-                    Afficher la colonne Assist (copie la quantité)
-                </label>
+            <h2>🦾 Mode d'assistance</h2>
+            <div class="input-group" id="assistModeGroup" style="max-width:400px;">
+                <div class="radio-group" style="display:flex;gap:8px;background:#f1f3f4;border-radius:8px;padding:4px;">
+                    <label class="radio-label" style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px 0;cursor:pointer;">
+                        <input type="radio" name="assistMode" id="assistModeNone" value="none" style="margin-right:8px;">
+                        Aucun
+                    </label>
+                    <label class="radio-label" style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px 0;cursor:pointer;">
+                        <input type="radio" name="assistMode" id="assistModeNormal" value="normal" style="margin-right:8px;">
+                        SuperEncodeur
+                    </label>
+                    <label class="radio-label" style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px 0;cursor:pointer;">
+                        <input type="radio" name="assistMode" id="assistModeAdmin" value="admin" style="margin-right:8px;">
+                        SuperEncodeur Admin
+                    </label>
+                </div>
+                <div class="help-text" style="margin-top:4px;font-size:12px;color:#888;">
+                    <b>Aucun</b> : désactive la colonne Assist.<br>
+                    <b>SuperEncodeur</b> : copie la quantité comme avant.<br>
+                    <b>SuperEncodeur Admin</b> : compatible tableau admin, lit la quantité dans l'input.
+                </div>
             </div>
         </div>
 

@@ -41,16 +41,37 @@ function setupEventListeners() {
     
     // Ajouter un premier créneau par défaut
     addScheduleInput();
+
+    document.getElementById('assistModeNone').addEventListener('change', handleAssistModeChange);
+    document.getElementById('assistModeNormal').addEventListener('change', handleAssistModeChange);
+    document.getElementById('assistModeAdmin').addEventListener('change', handleAssistModeChange);
+}
+
+function handleAssistModeChange() {
+    let mode = 'none';
+    if (document.getElementById('assistModeAdmin').checked) mode = 'admin';
+    else if (document.getElementById('assistModeNormal').checked) mode = 'normal';
+    // Sauvegarder immédiatement
+    chrome.storage.local.set({ assistMode: mode }, () => {
+        // Optionnel : afficher un message ou recharger la page si besoin
+    });
 }
 
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
-    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'showAssistColumn']);
+    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode']);
     
     teams = result.teams || [];
     dailyTarget = result.dailyTarget || 40;
-    // Charger l'état de la case à cocher
-    document.getElementById('showAssistColumn').checked = !!result.showAssistColumn;
+    // Charger le mode assist
+    const mode = result.assistMode || 'none';
+    if (mode === 'admin') {
+        document.getElementById('assistModeAdmin').checked = true;
+    } else if (mode === 'normal') {
+        document.getElementById('assistModeNormal').checked = true;
+    } else {
+        document.getElementById('assistModeNone').checked = true;
+    }
 }
 
 // Mettre à jour l'input de l'objectif
@@ -276,8 +297,7 @@ function updateDailyTarget() {
 // Sauvegarder tous les paramètres
 async function saveAllSettings() {
     dailyTarget = parseInt(document.getElementById('dailyTarget').value, 10) || 40;
-    const showAssistColumn = document.getElementById('showAssistColumn').checked;
-    await chrome.storage.local.set({ dailyTarget, showAssistColumn });
+    await chrome.storage.local.set({ dailyTarget });
     showMessage('Paramètres sauvegardés !', 'success');
 }
 
@@ -461,4 +481,17 @@ async function resetAutomationConfig() {
         updateAutomationUI();
         showMessage('Configuration réinitialisée aux valeurs par défaut.', 'success');
     }
+} 
+
+function updateAssistModeUI() {
+    const modeNormal = document.getElementById('assistModeNormal').checked;
+    const modeAdmin = document.getElementById('assistModeAdmin').checked;
+    // Si aucun mode n'est sélectionné, on désactive la case à cocher
+    document.getElementById('showAssistColumn').disabled = !(modeNormal || modeAdmin);
+    // Si la case est décochée, on ne sauvegarde pas le mode
+    if (!document.getElementById('showAssistColumn').checked) return;
+    // Sauvegarder le mode dans le storage
+    let mode = 'normal';
+    if (modeAdmin) mode = 'admin';
+    chrome.storage.local.set({ assistMode: mode });
 } 

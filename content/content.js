@@ -1367,6 +1367,7 @@ const exclureRefsCouleur = [
     '9471605',
     'CMPHT1076BNB',
     'EXA5610E',
+    'CLA03-0010',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1406,6 +1407,11 @@ const exclureRefsTaille = [
     '3343404',
     'EXA8529E',
     'CLA03-0012',
+    '3099406',
+    '3346402',
+    '3346503',
+    '3345602',
+    '3099318',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1424,7 +1430,7 @@ const exclureRefsNbPage = [
     // Ajoute ici les références à exclure pour le nombre de pages/vues
 ];
 // Largeur de la colonne Assist (modifiable facilement)
-const assistColumnWidth = 210; // en px
+const assistColumnWidth = 230; // en px
 // =====================
 
 // Fonction utilitaire pour extraire Simple/Double depuis un texte
@@ -1472,15 +1478,15 @@ function extractDetailFournitureFromText(text) {
         // Toujours afficher sans espace, minuscule pour cm
         return matchRegle[0].replace(/\s+/g, '').replace(/CM/i, 'cm');
     }
-    // Détail crayon : mine HB, B, 2B, 3B, 4B, 5B, 6B, 7B
-    const regexMine = /mine\s*(HB|[1-7]B|B)/i;
+    // Détail crayon : mine HB, B, 2B, ... et maintenant 2H, 3H, ... 9H
+    const regexMine = /mine\s*(HB|[1-9]B|B|[2-9]H|H)/i;
     const matchMine = text.match(regexMine);
     if (matchMine) {
-        // Affiche toujours "mine XX" (ex: mine HB, mine 2B)
+        // Affiche toujours "mine XX" (ex: mine HB, mine 2B, mine 2H)
         return 'mine ' + matchMine[1].toUpperCase();
     }
-    // Détail crayon sans le mot "mine" (ex: "CRAYON PAPIER 2B")
-    const regexCrayon = /crayon\s+papier.*?\b(HB|[1-7]B|B)\b/i;
+    // Détail crayon sans le mot "mine" (ex: "CRAYON PAPIER 2B", "CRAYON PAPIER 2H")
+    const regexCrayon = /crayon\s+papier.*?\b(HB|[1-9]B|B|[2-9]H|H)\b/i;
     const matchCrayon = text.match(regexCrayon);
     if (matchCrayon) {
         return 'mine ' + matchCrayon[1].toUpperCase();
@@ -1491,7 +1497,7 @@ function extractDetailFournitureFromText(text) {
 function extractNbPageOrVueFromText(text) {
     if (!text) return null;
     // Pages : 32P, 48P, 60P, 96P, 120P, 140P, 196P (insensible à la casse, avec ou sans espace)
-    const regexPage = /\b(32|48|60|96|120|140|196)\s*[pP]\b/;
+    const regexPage = /\b(32|48|60|96|100|120|140|192|196)\s*[pP]\b/;
     const matchPage = text.match(regexPage);
     if (matchPage) {
         return matchPage[1] + 'p';
@@ -1529,10 +1535,11 @@ const exclureRefsAlerteAgenda = [
     }
     const result = await new Promise(resolve => {
         try {
-            chrome.storage.local.get(['showAssistColumn'], resolve);
-        } catch (e) { resolve({ showAssistColumn: false }); }
+            chrome.storage.local.get(['assistMode'], resolve);
+        } catch (e) { resolve({ assistMode: 'none' }); }
     });
-    if (!result.showAssistColumn) {
+    const assistMode = result.assistMode || 'none';
+    if (assistMode === 'none') {
         removeAssistColumn();
         return;
     }
@@ -1546,24 +1553,21 @@ const exclureRefsAlerteAgenda = [
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
             assistCell.querySelector('.ag-header-cell-text').textContent = 'Assist';
-            // Largeur harmonisée
             assistCell.style.width = '210px';
             assistCell.style.minWidth = '210px';
             assistCell.style.maxWidth = '210px';
-            // Calcul du left : left(image) + width(image)
             const leftImage = parseInt(imageCell.style.left || '0');
             const widthImage = parseInt(imageCell.style.width || '0');
             const leftAssist = leftImage + widthImage;
             assistCell.style.left = leftAssist + 'px';
             assistCell.classList.remove('ag-column-first');
             headerRow.insertBefore(assistCell, codeRefCell);
-            // Décaler toutes les colonnes à droite de Assist
             let found = false;
             headerRow.querySelectorAll('.ag-header-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
                 else if (found) {
                     let left = parseInt(cell.style.left || '0');
-                    cell.style.left = (left + 210) + 'px';
+                    cell.style.left = (left + assistColumnWidth) + 'px';
                 }
             });
         }
@@ -1577,7 +1581,6 @@ const exclureRefsAlerteAgenda = [
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
             assistCell.style.width = assistCell.style.minWidth = assistCell.style.maxWidth = '210px';
-            // Calcul du left : left(image) + width(image)
             const leftImage = parseInt(imageCell.style.left || '0');
             const widthImage = parseInt(imageCell.style.width || '0');
             const leftAssist = leftImage + widthImage;
@@ -1586,9 +1589,16 @@ const exclureRefsAlerteAgenda = [
             const quantityCell = row.querySelector('[col-id="quantity"]');
             let quantityValue = '';
             if (quantityCell) {
-                const p = quantityCell.querySelector('p.inputValuProduct');
-                quantityValue = p ? p.textContent : quantityCell.textContent;
-                if (!quantityValue || quantityValue.trim() === '') quantityValue = 'erreur';
+                if (assistMode === 'admin') {
+                    // Mode admin : lire la valeur de l'input
+                    const input = quantityCell.querySelector('input.inputValuProduct[type="number"]');
+                    quantityValue = input ? input.value : 'erreur';
+                } else {
+                    // Mode normal : comportement classique
+                    const p = quantityCell.querySelector('p.inputValuProduct');
+                    quantityValue = p ? p.textContent : quantityCell.textContent;
+                    if (!quantityValue || quantityValue.trim() === '') quantityValue = 'erreur';
+                }
             } else {
                 quantityValue = 'erreur';
             }
@@ -1675,6 +1685,9 @@ const exclureRefsAlerteAgenda = [
             if (colorValue && colorHex && showColor) {
                 if (colorValue.toLowerCase() === 'vives') {
                     parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"${getRainbowStyle()}\">Vives</span>`);
+                } else if (colorValue.toLowerCase() === 'blanc') {
+                    // Badge spécial pour blanc : texte blanc sur fond gris
+                    parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"background: #e7e7e7; color: #fff; border-radius: 16px; padding: 0 14px; font-weight: bold; display: inline-block; margin-left: 4px; line-height: 1.6; text-shadow: none;\">${colorValue}</span>`);
                 } else {
                     parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;color: ${colorHex};text-shadow: 0 1px 1px #fff2;\">${colorValue}</span>`);
                 }
@@ -1688,7 +1701,7 @@ const exclureRefsAlerteAgenda = [
                 if (cell === assistCell) found = true;
                 else if (found) {
                     let left = parseInt(cell.style.left || '0');
-                    cell.style.left = (left + 210) + 'px';
+                    cell.style.left = (left + assistColumnWidth) + 'px';
                 }
             });
         }
@@ -1699,7 +1712,7 @@ const exclureRefsAlerteAgenda = [
     if (centerContainer) {
         const oldWidth = parseInt(centerContainer.style.width || '0');
         if (oldWidth) {
-            centerContainer.style.width = (oldWidth + 210) + 'px';
+            centerContainer.style.width = (oldWidth + assistColumnWidth) + 'px';
         } else {
             // fallback: calculer la largeur max des cellules
             let maxRight = 0;
@@ -1715,7 +1728,7 @@ const exclureRefsAlerteAgenda = [
     document.querySelectorAll('.ag-row').forEach(row => {
         const oldWidth = parseInt(row.style.width || '0');
         if (oldWidth) {
-            row.style.width = (oldWidth + 210) + 'px';
+            row.style.width = (oldWidth + assistColumnWidth) + 'px';
         } else {
             // fallback: largeur du container
             if (centerContainer && centerContainer.style.width) {
