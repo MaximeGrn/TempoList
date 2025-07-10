@@ -75,13 +75,17 @@ function createCrealisteContextMenu() {
     });
 }
 
-// Créer les menus contextuels spécifiques à rentreediscount.com
+// Créer les menus contextuels spécifiques à rentreediscount.com et scoleo.fr
 function createRentreeDiscountContextMenu() {
     chrome.contextMenus.create({
         id: "rotateImage",
         title: "🔄 Faire pivoter l'image",
         contexts: ["image"],
-        documentUrlPatterns: ["*://www.rentreediscount.com/*"]
+        documentUrlPatterns: [
+            "*://www.rentreediscount.com/*",
+            "*://scoleo.fr/*",
+            "*://*.scoleo.fr/*"
+        ]
     });
 }
 
@@ -93,21 +97,16 @@ async function updateContextMenuForTab(tabId) {
             tab.url.includes('crealiste.com') ||
             tab.url.includes('www.crealiste.com')
         );
-        
         const isRentreeDiscount = tab.url && tab.url.includes('www.rentreediscount.com');
-        
-        console.log(`Mise à jour menu contextuel pour: ${tab.url} - Crealiste: ${isCrealiste} - RentreeDiscount: ${isRentreeDiscount}`);
-        
-        // Supprimer tous les menus existants
+        const isScoleo = tab.url && (tab.url.includes('scoleo.fr') || tab.url.includes('www.scoleo.fr'));
+        console.log(`Mise à jour menu contextuel pour: ${tab.url} - Crealiste: ${isCrealiste} - RentreeDiscount: ${isRentreeDiscount} - Scoleo: ${isScoleo}`);
         chrome.contextMenus.removeAll(() => {
             if (isCrealiste) {
-                // Créer les menus spécifiques à crealiste
                 createCrealisteContextMenu();
                 console.log('Menus contextuels TempoList activés pour crealiste.com');
-            } else if (isRentreeDiscount) {
-                // Créer les menus spécifiques à rentreediscount
+            } else if (isRentreeDiscount || isScoleo) {
                 createRentreeDiscountContextMenu();
-                console.log('Menu de rotation d\'image activé pour rentreediscount.com');
+                console.log("Menu de rotation d'image activé pour rentreediscount.com ou scoleo.fr");
             } else {
                 console.log('Menus contextuels TempoList désactivés');
             }

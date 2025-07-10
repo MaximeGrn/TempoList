@@ -1165,9 +1165,9 @@ const imageRotations = new Map();
 
 // Fonction pour faire pivoter une image
 function rotateImage(srcUrl) {
-    // Vérifier qu'on est bien sur rentreediscount.com
-    if (!window.location.hostname.includes('rentreediscount.com')) {
-        console.log('[TempoList] Rotation d\'image uniquement disponible sur rentreediscount.com');
+    // Vérifier qu'on est bien sur rentreediscount.com ou scoleo.fr
+    if (!window.location.hostname.includes('rentreediscount.com') && !window.location.hostname.includes('scoleo.fr')) {
+        console.log('[TempoList] Rotation d\'image uniquement disponible sur rentreediscount.com ou scoleo.fr');
         return;
     }
     
@@ -1402,6 +1402,9 @@ const exclureRefsTaille = [
     'EXA8866E',
     'EXA8569E',
     'CLA03-0011',
+    '3343404',
+    'EXA8529E',
+    'CLA03-0012',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1500,6 +1503,18 @@ function extractNbPageOrVueFromText(text) {
     return null;
 }
 
+// Ajout : détection du type d'établissement (public/privé)
+let etabType = null;
+function detectEtabType() {
+    const infoDiv = document.querySelector('.informationEtab');
+    if (infoDiv) {
+        const text = infoDiv.textContent.toLowerCase();
+        if (text.includes('type : public')) etabType = 'public';
+        else if (text.includes('type : privé') || text.includes('type : prive')) etabType = 'privé';
+    }
+}
+detectEtabType();
+
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
         await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
@@ -1523,20 +1538,24 @@ function extractNbPageOrVueFromText(text) {
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
             assistCell.querySelector('.ag-header-cell-text').textContent = 'Assist';
-            // Largeur personnalisée pour Assist
-            assistCell.style.width = '120px';
-            assistCell.style.minWidth = '120px';
-            assistCell.style.maxWidth = '120px';
-            assistCell.style.left = codeRefCell.style.left;
+            // Largeur harmonisée
+            assistCell.style.width = '210px';
+            assistCell.style.minWidth = '210px';
+            assistCell.style.maxWidth = '210px';
+            // Calcul du left : left(image) + width(image)
+            const leftImage = parseInt(imageCell.style.left || '0');
+            const widthImage = parseInt(imageCell.style.width || '0');
+            const leftAssist = leftImage + widthImage;
+            assistCell.style.left = leftAssist + 'px';
             assistCell.classList.remove('ag-column-first');
             headerRow.insertBefore(assistCell, codeRefCell);
-            let assistWidth = 120; // Largeur fixe
+            // Décaler toutes les colonnes à droite de Assist
             let found = false;
             headerRow.querySelectorAll('.ag-header-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
-                if (found && cell !== assistCell) {
+                else if (found) {
                     let left = parseInt(cell.style.left || '0');
-                    cell.style.left = (left + assistWidth) + 'px';
+                    cell.style.left = (left + 210) + 'px';
                 }
             });
         }
@@ -1549,8 +1568,12 @@ function extractNbPageOrVueFromText(text) {
             const assistCell = imageCell.cloneNode(true);
             assistCell.setAttribute('col-id', 'assist');
             assistCell.setAttribute('aria-colindex', parseInt(imageCell.getAttribute('aria-colindex')) + 1);
-            assistCell.style.width = assistCell.style.minWidth = assistCell.style.maxWidth = assistColumnWidth + 'px';
-            assistCell.style.left = codeRefCell.style.left;
+            assistCell.style.width = assistCell.style.minWidth = assistCell.style.maxWidth = '210px';
+            // Calcul du left : left(image) + width(image)
+            const leftImage = parseInt(imageCell.style.left || '0');
+            const widthImage = parseInt(imageCell.style.width || '0');
+            const leftAssist = leftImage + widthImage;
+            assistCell.style.left = leftAssist + 'px';
             assistCell.classList.remove('ag-column-first');
             const quantityCell = row.querySelector('[col-id="quantity"]');
             let quantityValue = '';
@@ -1561,28 +1584,24 @@ function extractNbPageOrVueFromText(text) {
             } else {
                 quantityValue = 'erreur';
             }
-            // Récupérer la référence de la ligne
             let refValue = '';
             const refCell = row.querySelector('[col-id="codeRef"]');
             if (refCell) {
                 refValue = refCell.textContent.trim();
             }
             const nomCell = row.querySelector('[col-id="nom"]');
-            // Extraire Simple/Double (sauf si exclue)
             let simpleDoubleValue = '';
             if (nomCell && exclureRefsSimpleDouble.indexOf(refValue) === -1) {
                 const nomText = nomCell.textContent;
                 const sd = extractSimpleDoubleFromText(nomText);
                 if (sd) simpleDoubleValue = sd;
             }
-            // Extraire Détail Fourniture (sauf si exclue)
             let detailFournitureValue = '';
             if (nomCell && exclureRefsDetailFourniture.indexOf(refValue) === -1) {
                 const nomText = nomCell.textContent;
                 const detail = extractDetailFournitureFromText(nomText);
                 if (detail) detailFournitureValue = detail;
             }
-            // Extraire la taille depuis la colonne Nom (sauf si exclue)
             let tailleValue = '';
             if (nomCell && exclureRefsTaille.indexOf(refValue) === -1) {
                 const nomText = nomCell.textContent;
@@ -1591,7 +1610,6 @@ function extractNbPageOrVueFromText(text) {
                     tailleValue = taille;
                 }
             }
-            // Extraire la couleur depuis la colonne Nom (sauf si exclue)
             let colorValue = '';
             let colorHex = '';
             let showColor = true;
@@ -1606,14 +1624,30 @@ function extractNbPageOrVueFromText(text) {
                     colorHex = colorObj.hex;
                 }
             }
-            // Extraire le nombre de pages/vues depuis la colonne Nom (sauf si exclue)
             let nbPageOrVue = null;
             if (!exclureRefsNbPage.includes(refValue)) {
                 nbPageOrVue = extractNbPageOrVueFromText(nomCell.textContent);
             }
-            // Générer le HTML de la colonne Assist dans l'ordre demandé
+            // Ajout : détection agenda et alerte
+            let agendaAlerte = false;
+            let agendaType = null;
+            if (nomCell) {
+                const nomText = nomCell.textContent.toLowerCase();
+                if (nomText.includes('agenda')) {
+                    if (nomText.includes('privé') || nomText.includes('prive')) agendaType = 'privé';
+                    else if (nomText.includes('public')) agendaType = 'public';
+                    // Si on a les deux infos, on compare
+                    if (agendaType && etabType && agendaType !== etabType) {
+                        agendaAlerte = true;
+                    }
+                }
+            }
             let assistHtml = '';
             let parts = [`<span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span>`];
+            // Ajout : badge alerte si besoin
+            if (agendaAlerte) {
+                parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"background: #e74c3c; color: white; border-radius: 16px; padding: 0 14px; font-weight: bold; display: inline-block; margin-left: 4px; line-height: 1.6;\">Alerte</span>`);
+            }
             if (simpleDoubleValue) {
                 parts.push(`<span style=\"font-weight: bold;color: #222;\">|</span> <span style=\"font-weight: bold;\">${simpleDoubleValue}</span>`);
             }
@@ -1636,15 +1670,45 @@ function extractNbPageOrVueFromText(text) {
             assistHtml = `<div class=\"full-width-panel\" style=\"width: 100%;height: 40px;display: flex;align-items: center;justify-content: center;gap: 6px;\">${parts.join(' ')}</div>`;
             assistCell.innerHTML = assistHtml;
             row.insertBefore(assistCell, codeRefCell);
-            let assistWidth = assistColumnWidth;
+            // Décaler toutes les colonnes à droite de Assist
             let found = false;
             row.querySelectorAll('.ag-cell').forEach(cell => {
                 if (cell === assistCell) found = true;
-                if (found && cell !== assistCell) {
+                else if (found) {
                     let left = parseInt(cell.style.left || '0');
-                    cell.style.left = (left + assistWidth) + 'px';
+                    cell.style.left = (left + 210) + 'px';
                 }
             });
+        }
+    });
+    // --- AJUSTEMENT LARGEUR DES LIGNES ET CONTAINERS ---
+    // Ajuster la largeur du container principal des colonnes
+    const centerContainer = document.querySelector('.ag-center-cols-container');
+    if (centerContainer) {
+        const oldWidth = parseInt(centerContainer.style.width || '0');
+        if (oldWidth) {
+            centerContainer.style.width = (oldWidth + 210) + 'px';
+        } else {
+            // fallback: calculer la largeur max des cellules
+            let maxRight = 0;
+            centerContainer.querySelectorAll('.ag-cell').forEach(cell => {
+                const left = parseInt(cell.style.left || '0');
+                const width = parseInt(cell.style.width || '0');
+                if (left + width > maxRight) maxRight = left + width;
+            });
+            centerContainer.style.width = (maxRight) + 'px';
+        }
+    }
+    // Ajuster la largeur de chaque ligne
+    document.querySelectorAll('.ag-row').forEach(row => {
+        const oldWidth = parseInt(row.style.width || '0');
+        if (oldWidth) {
+            row.style.width = (oldWidth + 210) + 'px';
+        } else {
+            // fallback: largeur du container
+            if (centerContainer && centerContainer.style.width) {
+                row.style.width = centerContainer.style.width;
+            }
         }
     });
 })();
