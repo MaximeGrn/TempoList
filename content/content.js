@@ -1366,6 +1366,7 @@ const exclureRefsCouleur = [
     'EXA184073E',
     '9471605',
     'CMPHT1076BNB',
+    'EXA5610E',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1410,6 +1411,7 @@ const exclureRefsTaille = [
 // Références à exclure pour Simple/Double
 const exclureRefsSimpleDouble = [
     'P5625000',
+    'EXA5610E',
     // Ajoute ici d'autres références à exclure pour Simple/Double
 ];
 // Références à exclure pour Détail Fourniture
@@ -1514,6 +1516,12 @@ function detectEtabType() {
     }
 }
 detectEtabType();
+
+// Liste des références pour lesquelles il ne faut jamais afficher d'alerte agenda (ex: agendas mixtes public/privé)
+const exclureRefsAlerteAgenda = [
+    'CAT3760399301573',
+    // Ajoute ici les références à exclure de l'alerte agenda
+];
 
 (async function injectAssistColumnIfNeeded() {
     if (document.readyState === 'loading') {
@@ -1641,6 +1649,10 @@ detectEtabType();
                         agendaAlerte = true;
                     }
                 }
+            }
+            // Juste avant d'afficher l'alerte :
+            if (exclureRefsAlerteAgenda.indexOf(refValue) !== -1) {
+                agendaAlerte = false;
             }
             let assistHtml = '';
             let parts = [`<span class=\"assist-value\" style=\"font-weight: bold;\">${quantityValue}</span>`];
