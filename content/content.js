@@ -1368,6 +1368,8 @@ const exclureRefsCouleur = [
     'CMPHT1076BNB',
     'EXA5610E',
     'CLA03-0010',
+    'CATANOFOBAGNOIR',
+    'CLA60322C',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1412,6 +1414,8 @@ const exclureRefsTaille = [
     '3346503',
     '3345602',
     '3099318',
+    '3345802',
+    '4689600',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
