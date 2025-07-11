@@ -1370,6 +1370,7 @@ const exclureRefsCouleur = [
     'CLA03-0010',
     'CATANOFOBAGNOIR',
     'CLA60322C',
+    'MAP870102',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];
@@ -1416,6 +1417,8 @@ const exclureRefsTaille = [
     '3099318',
     '3345802',
     '4689600',
+    '3343904',
+    '3099408',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1757,7 +1760,7 @@ extractColorFromText = function(text) {
 function extractTailleFromText(text) {
     if (!text) return null;
     // Liste des tailles à détecter (tu peux en ajouter)
-    const tailles = ['24x32', '17x22', 'A4', 'A5', '11x17'];
+    const tailles = ['24x32', '17x22', 'A3', 'A4', 'A5', '11x17'];
     // Accepte aussi les variantes avec X majuscule
     const regexTailles = new RegExp(tailles.map(t => t.replace('x', '[xX]')).join('|'), 'i');
     const match = text.match(regexTailles);
