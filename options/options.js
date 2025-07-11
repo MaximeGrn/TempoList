@@ -3,7 +3,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeOptions();
     setupEventListeners();
-    setupTabNavigation();
+    // setupTabNavigation(); // plus besoin de navigation par onglet
     await loadAutomationConfig();
 });
 
@@ -42,19 +42,120 @@ function setupEventListeners() {
     // Ajouter un premier créneau par défaut
     addScheduleInput();
 
+    // Mode d'assistance
     document.getElementById('assistModeNone').addEventListener('change', handleAssistModeChange);
     document.getElementById('assistModeNormal').addEventListener('change', handleAssistModeChange);
     document.getElementById('assistModeAdmin').addEventListener('change', handleAssistModeChange);
+    
+    // Vitesse d'automatisation
+    document.getElementById('speedModeFast').addEventListener('change', handleSpeedModeChange);
+    document.getElementById('speedModeNormal').addEventListener('change', handleSpeedModeChange);
+    document.getElementById('speedModeSlow').addEventListener('change', handleSpeedModeChange);
+}
+
+// Fonction pour afficher des notifications modernes
+function showNotification(message, type = 'success') {
+    const container = document.getElementById('notificationsContainer');
+    const template = document.getElementById('notificationTemplate');
+    
+    if (!container || !template) return;
+    
+    // Cloner le template
+    const notification = template.content.cloneNode(true);
+    const notificationElement = notification.querySelector('.notification');
+    
+    // Configurer la notification
+    notificationElement.classList.add(type);
+    notification.querySelector('.notification-text').textContent = message;
+    
+    // Ajouter l'événement de fermeture
+    const closeBtn = notification.querySelector('.notification-close');
+    closeBtn.addEventListener('click', () => {
+        hideNotification(notificationElement);
+    });
+    
+    // Ajouter au container
+    container.appendChild(notification);
+    
+    // Animation d'entrée
+    setTimeout(() => {
+        notificationElement.classList.add('show');
+    }, 10);
+    
+    // Auto-fermeture après 3 secondes
+    setTimeout(() => {
+        hideNotification(notificationElement);
+    }, 3000);
+}
+
+function hideNotification(notificationElement) {
+    if (!notificationElement || !notificationElement.parentNode) return;
+    
+    notificationElement.classList.remove('show');
+    notificationElement.classList.add('hide');
+    
+    setTimeout(() => {
+        if (notificationElement.parentNode) {
+            notificationElement.parentNode.removeChild(notificationElement);
+        }
+    }, 300);
 }
 
 function handleAssistModeChange() {
     let mode = 'none';
-    if (document.getElementById('assistModeAdmin').checked) mode = 'admin';
-    else if (document.getElementById('assistModeNormal').checked) mode = 'normal';
+    let modeName = 'Aucun';
+    let notificationType = 'warning';
+    let message = 'Mode d\'assistance désactivé !';
+    
+    if (document.getElementById('assistModeAdmin').checked) {
+        mode = 'admin';
+        modeName = 'SuperEncodeur Admin';
+        notificationType = 'success';
+        message = 'Mode d\'assistance "SuperEncodeur Admin" activé !';
+    } else if (document.getElementById('assistModeNormal').checked) {
+        mode = 'normal';
+        modeName = 'SuperEncodeur';
+        notificationType = 'success';
+        message = 'Mode d\'assistance "SuperEncodeur" activé !';
+    }
+    
+    // Mettre à jour le slider animé
+    const modernRadioGroup = document.querySelector('.modern-radio-group');
+    if (modernRadioGroup) {
+        modernRadioGroup.setAttribute('data-value', mode);
+    }
+    
     // Sauvegarder immédiatement
     chrome.storage.local.set({ assistMode: mode }, () => {
-        // Optionnel : afficher un message ou recharger la page si besoin
+        showNotification(message, notificationType);
     });
+}
+
+function handleSpeedModeChange() {
+    let speed = 'normal';
+    let speedName = 'Normal';
+    
+    if (document.getElementById('speedModeFast').checked) {
+        speed = 'fast';
+        speedName = 'Rapide';
+    } else if (document.getElementById('speedModeSlow').checked) {
+        speed = 'slow';
+        speedName = 'Lent';
+    }
+    
+    // Mettre à jour le slider animé - utiliser un sélecteur plus spécifique
+    const speedRadioGroups = document.querySelectorAll('.modern-radio-group');
+    const speedRadioGroup = speedRadioGroups[1]; // Le deuxième groupe radio (vitesse)
+    if (speedRadioGroup) {
+        speedRadioGroup.setAttribute('data-value', speed);
+    }
+    
+    // Appliquer et sauvegarder la configuration
+    applyPreset(speed);
+    chrome.storage.sync.set({ automationConfig: { ...SPEED_PRESETS[speed] } }, () => {
+        showNotification(`Vitesse d'automatisation "${speedName}" sélectionnée !`, 'success');
+    });
+    currentAutomationConfig = { ...SPEED_PRESETS[speed] };
 }
 
 // Charger les paramètres depuis le stockage
@@ -71,6 +172,12 @@ async function loadSettings() {
         document.getElementById('assistModeNormal').checked = true;
     } else {
         document.getElementById('assistModeNone').checked = true;
+    }
+    
+    // Mettre à jour le slider animé
+    const modernRadioGroup = document.querySelector('.modern-radio-group');
+    if (modernRadioGroup) {
+        modernRadioGroup.setAttribute('data-value', mode);
     }
 }
 
@@ -288,10 +395,13 @@ async function deleteTeam(team) {
 
 // Mettre à jour l'objectif journalier
 function updateDailyTarget() {
-    const value = parseInt(document.getElementById('dailyTarget').value);
-    if (value && value > 0) {
-        dailyTarget = value;
-    }
+    const newTarget = parseInt(document.getElementById('dailyTarget').value, 10) || 40;
+    dailyTarget = newTarget;
+    
+    // Sauvegarde automatique avec notification
+    chrome.storage.local.set({ dailyTarget }, () => {
+        showNotification(`Objectif journalier mis à jour : ${dailyTarget} listes`, 'success');
+    });
 }
 
 // Sauvegarder tous les paramètres
@@ -360,7 +470,6 @@ function switchTab(tabName) {
 
 // === GESTION DE L'AUTOMATISATION ===
 
-// Préréglages de vitesse
 const SPEED_PRESETS = {
     fast: {
         delayBetweenActions: 100,
@@ -376,10 +485,7 @@ const SPEED_PRESETS = {
     }
 };
 
-let currentAutomationConfig = {
-    delayBetweenActions: 200,
-    delayBetweenCycles: 800
-};
+let currentAutomationConfig = { ...SPEED_PRESETS.normal };
 
 async function loadAutomationConfig() {
     try {
@@ -387,44 +493,32 @@ async function loadAutomationConfig() {
         if (result.automationConfig) {
             currentAutomationConfig = result.automationConfig;
         }
-        
-        // Mettre à jour l'interface
         updateAutomationUI();
-        setupAutomationEventListeners();
-        
+        // setupAutomationEventListeners(); // plus besoin car géré dans setupEventListeners
     } catch (error) {
         console.error('Erreur lors du chargement de la configuration d\'automatisation:', error);
     }
 }
 
-function setupAutomationEventListeners() {
-    // Préréglages
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const preset = e.currentTarget.dataset.preset;
-            applyPreset(preset);
-        });
-    });
-    
-    // Sauvegarde
-    document.getElementById('saveAutomationBtn').addEventListener('click', saveAutomationConfig);
-    
-    // Réinitialisation
-    document.getElementById('resetAutomationBtn').addEventListener('click', resetAutomationConfig);
-    
-    // Mise à jour en temps réel des inputs
-    document.getElementById('delayBetweenActions').addEventListener('input', updateConfigFromInputs);
-    document.getElementById('delayBetweenCycles').addEventListener('input', updateConfigFromInputs);
-}
-
 function updateAutomationUI() {
-    // Mettre à jour les inputs
-    document.getElementById('delayBetweenActions').value = currentAutomationConfig.delayBetweenActions;
-    document.getElementById('delayBetweenCycles').value = currentAutomationConfig.delayBetweenCycles;
-    
-    // Détecter et marquer le préréglage actuel
+    // Met à jour l'état actif des boutons radio
     const activePreset = detectActivePreset();
-    updatePresetButtons(activePreset);
+    
+    // Cocher le bon radio button
+    if (activePreset === 'fast') {
+        document.getElementById('speedModeFast').checked = true;
+    } else if (activePreset === 'slow') {
+        document.getElementById('speedModeSlow').checked = true;
+    } else {
+        document.getElementById('speedModeNormal').checked = true;
+    }
+    
+    // Mettre à jour le slider animé - utiliser un sélecteur plus spécifique
+    const speedRadioGroups = document.querySelectorAll('.modern-radio-group');
+    const speedRadioGroup = speedRadioGroups[1]; // Le deuxième groupe radio (vitesse)
+    if (speedRadioGroup) {
+        speedRadioGroup.setAttribute('data-value', activePreset || 'normal');
+    }
 }
 
 function detectActivePreset() {
@@ -434,16 +528,7 @@ function detectActivePreset() {
             return presetName;
         }
     }
-    return null; // Configuration personnalisée
-}
-
-function updatePresetButtons(activePreset) {
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.preset === activePreset) {
-            btn.classList.add('active');
-        }
-    });
+    return 'normal'; // Par défaut
 }
 
 function applyPreset(presetName) {
@@ -451,47 +536,4 @@ function applyPreset(presetName) {
         currentAutomationConfig = { ...SPEED_PRESETS[presetName] };
         updateAutomationUI();
     }
-}
-
-function updateConfigFromInputs() {
-    const delayBetweenActions = parseInt(document.getElementById('delayBetweenActions').value);
-    const delayBetweenCycles = parseInt(document.getElementById('delayBetweenCycles').value);
-    
-    currentAutomationConfig.delayBetweenActions = delayBetweenActions;
-    currentAutomationConfig.delayBetweenCycles = delayBetweenCycles;
-    
-    // Mettre à jour les boutons de préréglage
-    const activePreset = detectActivePreset();
-    updatePresetButtons(activePreset);
-}
-
-async function saveAutomationConfig() {
-    try {
-        await chrome.storage.sync.set({ automationConfig: currentAutomationConfig });
-        showMessage('Configuration d\'automatisation sauvegardée avec succès !', 'success');
-    } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error);
-        showMessage('Erreur lors de la sauvegarde de la configuration.', 'error');
-    }
-}
-
-async function resetAutomationConfig() {
-    if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration d\'automatisation ?')) {
-        currentAutomationConfig = { ...SPEED_PRESETS.normal };
-        updateAutomationUI();
-        showMessage('Configuration réinitialisée aux valeurs par défaut.', 'success');
-    }
-} 
-
-function updateAssistModeUI() {
-    const modeNormal = document.getElementById('assistModeNormal').checked;
-    const modeAdmin = document.getElementById('assistModeAdmin').checked;
-    // Si aucun mode n'est sélectionné, on désactive la case à cocher
-    document.getElementById('showAssistColumn').disabled = !(modeNormal || modeAdmin);
-    // Si la case est décochée, on ne sauvegarde pas le mode
-    if (!document.getElementById('showAssistColumn').checked) return;
-    // Sauvegarder le mode dans le storage
-    let mode = 'normal';
-    if (modeAdmin) mode = 'admin';
-    chrome.storage.local.set({ assistMode: mode });
 } 
