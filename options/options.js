@@ -25,22 +25,8 @@ async function initializeOptions() {
 
 // Configuration des événements
 function setupEventListeners() {
-    // Gestion des équipes
-    document.getElementById('addScheduleBtn').addEventListener('click', addScheduleInput);
-    document.getElementById('saveTeamBtn').addEventListener('click', saveTeam);
-    document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
-    
     // Gestion des paramètres
     document.getElementById('dailyTarget').addEventListener('input', updateDailyTarget);
-    document.getElementById('saveSettingsBtn').addEventListener('click', saveAllSettings);
-    
-    // Navigation
-    document.getElementById('backToPopupBtn').addEventListener('click', () => {
-        window.close();
-    });
-    
-    // Ajouter un premier créneau par défaut
-    addScheduleInput();
 
     // Mode d'assistance
     document.getElementById('assistModeNone').addEventListener('change', handleAssistModeChange);
@@ -51,6 +37,31 @@ function setupEventListeners() {
     document.getElementById('speedModeFast').addEventListener('change', handleSpeedModeChange);
     document.getElementById('speedModeNormal').addEventListener('change', handleSpeedModeChange);
     document.getElementById('speedModeSlow').addEventListener('change', handleSpeedModeChange);
+    
+    // === GESTION DU POPUP MODAL DES ÉQUIPES ===
+    
+    // Bouton pour créer une équipe
+    document.getElementById('createTeamBtn').addEventListener('click', openCreateTeamModal);
+    
+    // Boutons du modal
+    document.getElementById('closeModalBtn').addEventListener('click', closeTeamModal);
+    document.getElementById('modalCancelBtn').addEventListener('click', closeTeamModal);
+    document.getElementById('modalSaveBtn').addEventListener('click', saveTeamFromModal);
+    document.getElementById('modalAddScheduleBtn').addEventListener('click', addModalScheduleInput);
+    
+    // Fermer le modal en cliquant sur l'overlay
+    document.getElementById('teamManagementModal').addEventListener('click', (e) => {
+        if (e.target.id === 'teamManagementModal') {
+            closeTeamModal();
+        }
+    });
+    
+    // Échapper pour fermer le modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('teamManagementModal').classList.contains('show')) {
+            closeTeamModal();
+        }
+    });
 }
 
 // Fonction pour afficher des notifications modernes
@@ -186,7 +197,7 @@ function updateTargetInput() {
     document.getElementById('dailyTarget').value = dailyTarget;
 }
 
-// Ajouter un nouveau créneau horaire
+// Ajouter un nouveau créneau horaire (pour l'ancien formulaire - plus utilisé)
 function addScheduleInput() {
     const template = document.getElementById('scheduleTemplate');
     const clone = template.content.cloneNode(true);
@@ -200,18 +211,102 @@ function addScheduleInput() {
     document.getElementById('schedulesList').appendChild(clone);
 }
 
-// Sauvegarder une équipe
-async function saveTeam() {
-    const teamName = document.getElementById('teamName').value.trim();
+// === NOUVELLES FONCTIONS POUR LE POPUP MODAL ===
+
+// Ajouter un nouveau créneau horaire dans le modal
+function addModalScheduleInput() {
+    const template = document.getElementById('scheduleTemplate');
+    const clone = template.content.cloneNode(true);
+    
+    // Ajouter l'événement de suppression
+    const removeBtn = clone.querySelector('.remove-schedule-btn');
+    removeBtn.addEventListener('click', function() {
+        this.closest('.schedule-item').remove();
+    });
+    
+    document.getElementById('modalSchedulesList').appendChild(clone);
+}
+
+// Ouvrir le modal pour créer une nouvelle équipe
+function openCreateTeamModal() {
+    currentEditingTeam = null;
+    document.getElementById('modalTitle').innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16">
+          <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0m3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4"/>
+        </svg>
+        Créer une équipe
+    `;
+    
+    resetModalForm();
+    showTeamModal();
+}
+
+// Ouvrir le modal pour éditer une équipe existante
+function openEditTeamModal(team) {
+    currentEditingTeam = team;
+    document.getElementById('modalTitle').innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+          <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+          <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+        </svg>
+        Modifier l'équipe
+    `;
+    
+    // Remplir le formulaire avec les données de l'équipe
+    document.getElementById('modalTeamName').value = team.name;
+    
+    // Vider et remplir les horaires
+    document.getElementById('modalSchedulesList').innerHTML = '';
+    
+    team.schedules.forEach(schedule => {
+        addModalScheduleInput();
+        const scheduleItems = document.querySelectorAll('#modalSchedulesList .schedule-item');
+        const lastItem = scheduleItems[scheduleItems.length - 1];
+        
+        lastItem.querySelector('.start-time').value = schedule.start;
+        lastItem.querySelector('.end-time').value = schedule.end;
+    });
+    
+    showTeamModal();
+}
+
+// Afficher le modal
+function showTeamModal() {
+    const modal = document.getElementById('teamManagementModal');
+    modal.classList.add('show');
+    
+    // Focus sur le champ nom d'équipe
+    setTimeout(() => {
+        document.getElementById('modalTeamName').focus();
+    }, 300);
+}
+
+// Fermer le modal
+function closeTeamModal() {
+    const modal = document.getElementById('teamManagementModal');
+    modal.classList.remove('show');
+    currentEditingTeam = null;
+}
+
+// Réinitialiser le formulaire du modal
+function resetModalForm() {
+    document.getElementById('modalTeamName').value = '';
+    document.getElementById('modalSchedulesList').innerHTML = '';
+    addModalScheduleInput(); // Ajouter un créneau par défaut
+}
+
+// Sauvegarder l'équipe depuis le modal
+async function saveTeamFromModal() {
+    const teamName = document.getElementById('modalTeamName').value.trim();
     
     if (!teamName) {
-        showMessage('Veuillez saisir un nom d\'équipe.', 'error');
+        showNotification('Veuillez saisir un nom d\'équipe.', 'warning');
         return;
     }
     
     // Récupérer les horaires
     const schedules = [];
-    const scheduleItems = document.querySelectorAll('#schedulesList .schedule-item');
+    const scheduleItems = document.querySelectorAll('#modalSchedulesList .schedule-item');
     
     for (const item of scheduleItems) {
         const startTime = item.querySelector('.start-time').value;
@@ -219,7 +314,7 @@ async function saveTeam() {
         
         if (startTime && endTime) {
             if (startTime >= endTime) {
-                showMessage('L\'heure de fin doit être après l\'heure de début.', 'error');
+                showNotification('L\'heure de fin doit être après l\'heure de début.', 'warning');
                 return;
             }
             schedules.push({ start: startTime, end: endTime });
@@ -227,16 +322,19 @@ async function saveTeam() {
     }
     
     if (schedules.length === 0) {
-        showMessage('Veuillez ajouter au moins un créneau horaire.', 'error');
+        showNotification('Veuillez ajouter au moins un créneau horaire.', 'warning');
         return;
     }
     
     // Vérifier si l'équipe existe déjà (pour l'édition)
     let team;
+    let actionMessage;
+    
     if (currentEditingTeam) {
         team = currentEditingTeam;
         team.name = teamName;
         team.schedules = schedules;
+        actionMessage = 'Équipe modifiée avec succès !';
     } else {
         // Nouvelle équipe
         team = {
@@ -245,50 +343,36 @@ async function saveTeam() {
             schedules: schedules
         };
         teams.push(team);
+        actionMessage = 'Équipe créée avec succès !';
     }
     
     try {
         await chrome.storage.local.set({ teams: teams });
-        showMessage('Équipe sauvegardée avec succès !', 'success');
+        showNotification(actionMessage, 'success');
         
-        // Réinitialiser le formulaire
-        resetTeamForm();
+        // Mettre à jour l'affichage des équipes
         displayTeams();
+        
+        // Fermer le modal
+        closeTeamModal();
         
     } catch (error) {
         console.error('Erreur lors de la sauvegarde:', error);
-        showMessage('Erreur lors de la sauvegarde.', 'error');
+        showNotification('Erreur lors de la sauvegarde.', 'warning');
     }
 }
+
+// FONCTION OBSOLÈTE - Sauvegarder une équipe (remplacée par saveTeamFromModal)
+// async function saveTeam() { ... }
 
 // Générer un ID unique pour une équipe
 function generateTeamId() {
     return 'team_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-// Réinitialiser le formulaire d'équipe
-function resetTeamForm() {
-    document.getElementById('teamName').value = '';
-    document.getElementById('schedulesList').innerHTML = '';
-    addScheduleInput();
-    
-    currentEditingTeam = null;
-    document.getElementById('cancelEditBtn').style.display = 'none';
-    
-    const saveBtn = document.getElementById('saveTeamBtn');
-    saveBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-floppy2-fill" viewBox="0 0 16 16">
-          <path d="M12 2h-2v3h2z"/>
-          <path d="M1.5 0A1.5 1.5 0 0 0 0 1.5v13A1.5 1.5 0 0 0 1.5 16h13a1.5 1.5 0 0 0 1.5-1.5V2.914a1.5 1.5 0 0 0-.44-1.06L14.147.439A1.5 1.5 0 0 0 13.086 0zM4 6a1 1 0 0 1-1-1V1h10v4a1 1 0 0 1-1 1zM3 9h10a1 1 0 0 1 1 1v5H2v-5a1 1 0 0 1 1-1"/>
-        </svg>
-        Sauvegarder l'équipe
-    `;
-}
-
-// Annuler l'édition
-function cancelEdit() {
-    resetTeamForm();
-}
+// FONCTIONS OBSOLÈTES - Remplacées par les fonctions du modal
+// function resetTeamForm() { ... }
+// function cancelEdit() { ... }
 
 // Afficher les équipes existantes
 function displayTeams() {
@@ -326,7 +410,7 @@ function createTeamCard(team) {
     
     // Ajouter les événements
     const editBtn = clone.querySelector('.edit-team-btn');
-    editBtn.addEventListener('click', () => editTeam(team));
+    editBtn.addEventListener('click', () => openEditTeamModal(team));
     
     const deleteBtn = clone.querySelector('.delete-team-btn');
     deleteBtn.addEventListener('click', () => deleteTeam(team));
@@ -334,40 +418,8 @@ function createTeamCard(team) {
     return clone;
 }
 
-// Éditer une équipe
-function editTeam(team) {
-    currentEditingTeam = team;
-    
-    // Remplir le formulaire
-    document.getElementById('teamName').value = team.name;
-    
-    // Vider et remplir les horaires
-    document.getElementById('schedulesList').innerHTML = '';
-    
-    team.schedules.forEach(schedule => {
-        addScheduleInput();
-        const scheduleItems = document.querySelectorAll('#schedulesList .schedule-item');
-        const lastItem = scheduleItems[scheduleItems.length - 1];
-        
-        lastItem.querySelector('.start-time').value = schedule.start;
-        lastItem.querySelector('.end-time').value = schedule.end;
-    });
-    
-    // Modifier l'interface
-    document.getElementById('cancelEditBtn').style.display = 'inline-block';
-    
-    const saveBtn = document.getElementById('saveTeamBtn');
-    saveBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
-          <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
-          <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
-        </svg>
-        Modifier l'équipe
-    `;
-    
-    // Faire défiler vers le formulaire
-    document.querySelector('.team-form').scrollIntoView({ behavior: 'smooth' });
-}
+// FONCTION OBSOLÈTE - Éditer une équipe (remplacée par openEditTeamModal)
+// function editTeam(team) { ... }
 
 // Supprimer une équipe
 async function deleteTeam(team) {
@@ -382,9 +434,9 @@ async function deleteTeam(team) {
         showMessage('Équipe supprimée avec succès !', 'success');
         displayTeams();
         
-        // Si c'était l'équipe en cours d'édition, réinitialiser le formulaire
+        // Si c'était l'équipe en cours d'édition, réinitialiser la variable
         if (currentEditingTeam && currentEditingTeam.id === team.id) {
-            resetTeamForm();
+            currentEditingTeam = null;
         }
         
     } catch (error) {
@@ -404,12 +456,8 @@ function updateDailyTarget() {
     });
 }
 
-// Sauvegarder tous les paramètres
-async function saveAllSettings() {
-    dailyTarget = parseInt(document.getElementById('dailyTarget').value, 10) || 40;
-    await chrome.storage.local.set({ dailyTarget });
-    showMessage('Paramètres sauvegardés !', 'success');
-}
+// FONCTION OBSOLÈTE - Sauvegarder tous les paramètres (remplacée par la sauvegarde automatique)
+// async function saveAllSettings() { ... }
 
 // Afficher un message
 function showMessage(text, type) {
