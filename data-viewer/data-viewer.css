@@ -1,0 +1,317 @@
+/* Variables CSS */
+:root {
+    --primary-color: #3b82f6;
+    --secondary-color: #64748b;
+    --background-color: #f8fafc;
+    --background-muted: #f1f5f9;
+    --border-color: #e2e8f0;
+    --text-color: #1e293b;
+    --text-muted: #64748b;
+    --success-color: #059669;
+    --warning-color: #d97706;
+    --error-color: #dc2626;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Reset et base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+}
+
+header h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+header h1 svg {
+    color: var(--primary-color);
+}
+
+.header-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.refresh-btn:hover {
+    background: #2563eb;
+}
+
+/* Sections */
+.data-section {
+    margin-bottom: 32px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.data-section h2 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    background: var(--background-muted);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.data-section h2 svg {
+    color: var(--primary-color);
+}
+
+.data-count {
+    padding: 4px 8px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: auto;
+}
+
+/* Tables */
+.table-container {
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.data-table th {
+    position: sticky;
+    top: 0;
+    background: var(--background-muted);
+    color: var(--text-color);
+    font-weight: 600;
+    padding: 16px 12px;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    z-index: 10;
+}
+
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--background-muted);
+}
+
+.data-table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.data-table tbody tr:nth-child(even):hover {
+    background-color: var(--background-muted);
+}
+
+/* Colonnes spécifiques */
+.vote-positive {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.vote-negative {
+    color: var(--error-color);
+    font-weight: 600;
+}
+
+.percentage-cell {
+    font-weight: 600;
+}
+
+.percentage-high {
+    color: var(--success-color);
+}
+
+.percentage-medium {
+    color: var(--warning-color);
+}
+
+.percentage-low {
+    color: var(--error-color);
+}
+
+.timestamp-cell {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.reference-cell {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 13px;
+    background: var(--background-muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.encoder-cell {
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+.level-cell {
+    background: var(--background-muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-transform: capitalize;
+    display: inline-block;
+}
+
+.coefficient-cell {
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Messages d'état */
+.loading {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 40px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 60px 40px;
+    color: var(--text-muted);
+}
+
+.no-data h3 {
+    font-size: 20px;
+    margin: 16px 0 8px 0;
+    color: var(--text-color);
+}
+
+.no-data p {
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
+    }
+    
+    header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+    
+    .data-table {
+        font-size: 12px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 8px 6px;
+    }
+    
+    header h1 {
+        font-size: 20px;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.data-section {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Scroll indicators */
+.table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: var(--background-muted);
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+} 

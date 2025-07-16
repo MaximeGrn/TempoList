@@ -42,6 +42,7 @@ function setupEventListeners() {
     document.getElementById('enableEncoderStats').addEventListener('change', handleEncoderStatsChange);
     document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
     document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
+    document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
     document.getElementById('resetStatsBtn').addEventListener('click', resetAllStats);
     
     // === GESTION DU POPUP MODAL DES ÉQUIPES ===
@@ -672,6 +673,15 @@ async function resetAllStats() {
     }
 }
 
+// Ouvrir le visualiseur de données brutes
+async function openDataViewer() {
+    // Créer l'URL pour ouvrir la page de données
+    const dataViewerUrl = chrome.runtime.getURL('data-viewer/data-viewer.html');
+    
+    // Ouvrir dans un nouvel onglet
+    chrome.tabs.create({ url: dataViewerUrl });
+}
+
 // Charger et afficher les statistiques - NOUVEAU SYSTÈME
 async function loadAndDisplayStats() {
     try {
@@ -759,8 +769,15 @@ function generateEncodersRanking(voteHistory, encoderStats) {
         }
     }
 
-    // Trier par score décroissant
-    encodersWithScores.sort((a, b) => b.score - a.score);
+    // Trier par score décroissant, puis par nombre de votes décroissant en cas d'égalité
+    encodersWithScores.sort((a, b) => {
+        // D'abord par pourcentage (score)
+        if (b.score !== a.score) {
+            return b.score - a.score;
+        }
+        // En cas d'égalité de pourcentage, par nombre de votes
+        return b.totalVotes - a.totalVotes;
+    });
 
     // Générer le HTML du classement
     let rankingHTML = '';

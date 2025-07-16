@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempoList - Données des Statistiques</title>
+    <link rel="stylesheet" href="data-viewer.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-table" viewBox="0 0 16 16">
+                  <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm15 2h-4v3h4zm0 4h-4v3h4zm0 4h-4v3h3a1 1 0 0 0 1-1zm-5 3v-3H6v3zm-5 0v-3H1v2a1 1 0 0 0 1 1zm-4-4h4V8H1zm0-4h4V4H1zm5-3v3h4V4zm4 4H6v3h4z"/>
+                </svg>
+                Données des Statistiques TempoList
+            </h1>
+            <div class="header-info">
+                <span id="lastUpdate">Chargement...</span>
+                <button type="button" id="refreshBtn" class="refresh-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                      <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                    </svg>
+                    Actualiser
+                </button>
+            </div>
+        </header>
+
+        <!-- Historique des votes -->
+        <section class="data-section">
+            <h2>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16">
+                  <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
+                  <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
+                  <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
+                </svg>
+                Historique des Votes
+                <span id="voteCount" class="data-count">-</span>
+            </h2>
+            <div class="table-container">
+                <table id="voteHistoryTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date/Heure</th>
+                            <th>Encodeur</th>
+                            <th>Référence Liste</th>
+                            <th>Vote</th>
+                            <th>Niveau</th>
+                            <th>Coefficient</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" class="loading">Chargement des données...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Statistiques agrégées -->
+        <section class="data-section">
+            <h2>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-graph-up" viewBox="0 0 16 16">
+                  <path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/>
+                </svg>
+                Statistiques Agrégées
+                <span id="statsCount" class="data-count">-</span>
+            </h2>
+            <div class="table-container">
+                <table id="encoderStatsTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Encodeur</th>
+                            <th>Total Votes</th>
+                            <th>Score Positif</th>
+                            <th>Score Négatif</th>
+                            <th>Pourcentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" class="loading">Chargement des données...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Message si pas de données -->
+        <div id="noDataMessage" class="no-data" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-database-slash" viewBox="0 0 16 16" style="opacity: 0.3;">
+              <path d="M13.879 10.414a2.501 2.501 0 0 0 0-4.828C13.395 4.099 10.977 3 8 3s-5.395 1.099-5.879 2.586a2.501 2.501 0 0 0 0 4.828C2.605 11.901 5.023 13 8 13s5.395-1.099 5.879-2.586"/>
+              <path fill-rule="evenodd" d="M4 5.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5M4 7.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5M4 9.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5M1.854 1.146a.5.5 0 1 0-.708.708l14 14a.5.5 0 0 0 .708-.708z"/>
+            </svg>
+            <h3>Aucune donnée disponible</h3>
+            <p>Les statistiques des encodeurs ne sont pas encore activées ou aucun vote n'a été enregistré.</p>
+        </div>
+    </div>
+
+    <script src="data-viewer.js"></script>
+</body>
+</html> 
