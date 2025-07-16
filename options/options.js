@@ -38,6 +38,12 @@ function setupEventListeners() {
     document.getElementById('speedModeNormal').addEventListener('change', handleSpeedModeChange);
     document.getElementById('speedModeSlow').addEventListener('change', handleSpeedModeChange);
     
+    // Statistiques encodeurs
+    document.getElementById('enableEncoderStats').addEventListener('change', handleEncoderStatsChange);
+    document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
+    document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
+    document.getElementById('resetStatsBtn').addEventListener('click', resetAllStats);
+    
     // === GESTION DU POPUP MODAL DES ÉQUIPES ===
     
     // Bouton pour créer une équipe
@@ -169,9 +175,20 @@ function handleSpeedModeChange() {
     currentAutomationConfig = { ...SPEED_PRESETS[speed] };
 }
 
+function handleEncoderStatsChange() {
+    const isEnabled = document.getElementById('enableEncoderStats').checked;
+    const message = isEnabled ? 'Statistiques encodeurs activées !' : 'Statistiques encodeurs désactivées !';
+    const notificationType = isEnabled ? 'success' : 'warning';
+    
+    // Sauvegarder immédiatement
+    chrome.storage.local.set({ enableEncoderStats: isEnabled }, () => {
+        showNotification(message, notificationType);
+    });
+}
+
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
-    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode']);
+    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats']);
     
     teams = result.teams || [];
     dailyTarget = result.dailyTarget || 40;
@@ -184,6 +201,10 @@ async function loadSettings() {
     } else {
         document.getElementById('assistModeNone').checked = true;
     }
+    
+    // Charger les statistiques encodeurs
+    const isEncoderStatsEnabled = result.enableEncoderStats || false;
+    document.getElementById('enableEncoderStats').checked = isEncoderStatsEnabled;
     
     // Mettre à jour le slider animé
     const modernRadioGroup = document.querySelector('.modern-radio-group');
@@ -584,4 +605,234 @@ function applyPreset(presetName) {
         currentAutomationConfig = { ...SPEED_PRESETS[presetName] };
         updateAutomationUI();
     }
-} 
+}
+
+// === GESTION DES STATISTIQUES DES ENCODEURS ===
+
+// Ouvrir la modal des statistiques
+async function openStatsModal() {
+    // Vérifier si les statistiques sont activées
+    const result = await chrome.storage.local.get(['enableEncoderStats']);
+    if (!result.enableEncoderStats) {
+        showNotification('Les statistiques des encodeurs ne sont pas activées !', 'warning');
+        return;
+    }
+
+    // Charger et afficher les statistiques
+    await loadAndDisplayStats();
+    
+    // Afficher la modal
+    const modal = document.getElementById('statsModal');
+    modal.classList.add('show');
+}
+
+// Fermer la modal des statistiques
+function closeStatsModal() {
+    const modal = document.getElementById('statsModal');
+    modal.classList.remove('show');
+}
+
+// Réinitialiser toutes les statistiques des encodeurs
+async function resetAllStats() {
+    const confirmed = confirm(
+        '⚠️ ATTENTION ⚠️\n\n' +
+        'Vous êtes sur le point de supprimer TOUTES les statistiques des encodeurs.\n\n' +
+        '• Historique complet des votes\n' +
+        '• Statistiques agrégées\n' +
+        '• Classements\n\n' +
+        'Cette action est IRRÉVERSIBLE !\n\n' +
+        'Voulez-vous vraiment continuer ?'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        // Vider les deux tableaux dans le storage
+        await chrome.storage.local.set({ 
+            voteHistory: [],
+            encoderStats: {}
+        });
+
+        // Supprimer aussi les anciennes données si elles existent
+        await chrome.storage.local.remove(['encoderVotes']);
+
+        // Fermer la modal
+        closeStatsModal();
+
+        // Notification de succès
+        showNotification('✅ Toutes les statistiques ont été supprimées !', 'success');
+
+        console.log('[TempoList] Statistiques réinitialisées avec succès');
+
+    } catch (error) {
+        console.error('[TempoList] Erreur lors de la réinitialisation:', error);
+        showNotification('❌ Erreur lors de la réinitialisation des statistiques', 'error');
+    }
+}
+
+// Charger et afficher les statistiques - NOUVEAU SYSTÈME
+async function loadAndDisplayStats() {
+    try {
+        const result = await chrome.storage.local.get(['voteHistory', 'encoderStats']);
+        const voteHistory = result.voteHistory || [];
+        const encoderStats = result.encoderStats || {};
+        
+        // Si pas de données
+        if (Object.keys(encoderStats).length === 0) {
+            document.getElementById('noStatsMessage').style.display = 'block';
+            document.querySelector('.stats-summary').style.display = 'none';
+            document.querySelector('.encoders-ranking').style.display = 'none';
+            return;
+        }
+
+        // Cacher le message "pas de stats"
+        document.getElementById('noStatsMessage').style.display = 'none';
+        document.querySelector('.stats-summary').style.display = 'grid';
+        document.querySelector('.encoders-ranking').style.display = 'block';
+
+        // Calculer les statistiques globales
+        const stats = calculateGlobalStats(voteHistory, encoderStats);
+        
+        // Mettre à jour l'affichage des statistiques générales
+        document.getElementById('totalEncoders').textContent = stats.totalEncoders;
+        document.getElementById('totalVotes').textContent = stats.totalVotes;
+        document.getElementById('avgScore').textContent = stats.avgScore + '%';
+
+        // Générer le classement des encodeurs
+        generateEncodersRanking(voteHistory, encoderStats);
+
+    } catch (error) {
+        console.error('Erreur lors du chargement des statistiques:', error);
+        showNotification('Erreur lors du chargement des statistiques', 'error');
+    }
+}
+
+// Calculer les statistiques globales - NOUVEAU SYSTÈME
+function calculateGlobalStats(voteHistory, encoderStats) {
+    const totalEncoders = Object.keys(encoderStats).length;
+    const totalVotes = voteHistory.length;
+    
+    let totalScore = 0;
+    let encodersWithVotes = 0;
+
+    for (const encoderName in encoderStats) {
+        const stats = encoderStats[encoderName];
+        if (stats.totalVotes > 0) {
+            totalScore += stats.percentage;
+            encodersWithVotes++;
+        }
+    }
+
+    const avgScore = encodersWithVotes > 0 ? Math.round(totalScore / encodersWithVotes) : 0;
+
+    return {
+        totalEncoders,
+        totalVotes,
+        avgScore
+    };
+}
+
+// Générer le classement des encodeurs - NOUVEAU SYSTÈME
+function generateEncodersRanking(voteHistory, encoderStats) {
+    const rankingContainer = document.getElementById('encodersRanking');
+    
+    // Créer un tableau des encodeurs avec leurs scores
+    const encodersWithScores = [];
+    
+    for (const encoderName in encoderStats) {
+        const stats = encoderStats[encoderName];
+        
+        if (stats.totalVotes > 0) {
+            // Compter le nombre de listes uniques votées pour cet encodeur
+            const listsCount = voteHistory.filter(vote => vote.encoderName === encoderName).length;
+            
+            encodersWithScores.push({
+                name: encoderName,
+                score: stats.percentage,
+                positiveVotes: stats.positiveScore,
+                negativeVotes: stats.negativeScore,
+                totalVotes: stats.totalVotes,
+                listsCount: listsCount
+            });
+        }
+    }
+
+    // Trier par score décroissant
+    encodersWithScores.sort((a, b) => b.score - a.score);
+
+    // Générer le HTML du classement
+    let rankingHTML = '';
+    
+    encodersWithScores.forEach((encoder, index) => {
+        const rank = index + 1;
+        let rankIcon = '📊';
+        let rankColor = '#6b7280';
+        
+        if (rank === 1) {
+            rankIcon = '🥇';
+            rankColor = '#d97706';
+        } else if (rank === 2) {
+            rankIcon = '🥈';
+            rankColor = '#6b7280';
+        } else if (rank === 3) {
+            rankIcon = '🥉';
+            rankColor = '#92400e';
+        }
+
+        let scoreColor = '#6b7280';
+        if (encoder.score >= 80) scoreColor = '#059669';
+        else if (encoder.score >= 60) scoreColor = '#d97706';
+        else scoreColor = '#dc2626';
+
+        const progressWidth = Math.max(encoder.score, 5); // Minimum 5% pour la visibilité
+
+        rankingHTML += `
+            <div style="display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color);">
+                <div style="font-size: 20px; margin-right: 12px; color: ${rankColor};">${rankIcon}</div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; color: var(--text-color); margin-bottom: 4px; truncate;">
+                        ${encoder.name}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <div style="flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                            <div style="height: 100%; background: ${scoreColor}; width: ${progressWidth}%; transition: width 0.3s ease;"></div>
+                        </div>
+                        <div style="font-weight: 700; color: ${scoreColor}; font-size: 16px; min-width: 50px;">
+                            ${encoder.score.toFixed(1)}%
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted);">
+                        ${encoder.totalVotes.toFixed(1)} votes • ${encoder.listsCount} listes • 
+                        ✅ ${encoder.positiveVotes.toFixed(1)} • ❌ ${encoder.negativeVotes.toFixed(1)}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (rankingHTML === '') {
+        rankingHTML = `
+            <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                Aucun encodeur avec des votes
+            </div>
+        `;
+    }
+
+    rankingContainer.innerHTML = rankingHTML;
+}
+
+// Fermer la modal en cliquant sur l'overlay
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'statsModal') {
+        closeStatsModal();
+    }
+});
+
+// Échapper pour fermer la modal des stats
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('statsModal').classList.contains('show')) {
+        closeStatsModal();
+    }
+}); 

@@ -1419,6 +1419,8 @@ const exclureRefsTaille = [
     '4689600',
     '3343904',
     '3099408',
+    '3343604',
+    'EXA8519E',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1780,3 +1782,547 @@ function removeAssistColumn() {
     document.querySelectorAll('.ag-header-row [col-id="assist"]').forEach(cell => cell.remove());
     document.querySelectorAll('.ag-row [col-id="assist"]').forEach(cell => cell.remove());
 } 
+
+// === SYSTÈME DE STATISTIQUES DES ENCODEURS ===
+
+// Structure pour stocker les statistiques - NOUVEAU SYSTÈME
+let voteHistory = []; // Historique complet de tous les votes
+let encoderStats = {}; // Statistiques agrégées par encodeur
+let currentListInfo = null; // Informations sur la liste actuelle
+
+// Coefficients selon le niveau
+const LEVEL_COEFFICIENTS = {
+    'primaire': 1,
+    'maternelle': 1,
+    'collège': 2,
+    'collge': 2, // Au cas où il y aurait une faute de frappe
+    'college': 2,
+    'lycée': 2.25,
+    'lycee': 2.25
+};
+
+// Initialiser le système de statistiques
+async function initEncoderStats() {
+    try {
+        // Vérifier si la fonctionnalité est activée
+        const result = await chrome.storage.local.get(['enableEncoderStats']);
+        if (!result.enableEncoderStats) {
+            return; // Fonctionnalité désactivée
+        }
+
+        // Charger les données existantes - NOUVEAU SYSTÈME
+        const dataResult = await chrome.storage.local.get(['voteHistory', 'encoderStats']);
+        voteHistory = dataResult.voteHistory || [];
+        encoderStats = dataResult.encoderStats || {};
+        
+        // Si on a des anciennes données encoderVotes, les migrer
+        const oldVotesResult = await chrome.storage.local.get(['encoderVotes']);
+        if (oldVotesResult.encoderVotes && voteHistory.length === 0) {
+            console.log('[TempoList] Migration des anciennes données...');
+            await migrateOldData(oldVotesResult.encoderVotes);
+        }
+
+        // Détecter si on est sur une page de liste
+        if (detectListPage()) {
+            setupEncoderStatsUI();
+        }
+    } catch (error) {
+        console.error('[TempoList] Erreur lors de l\'initialisation des statistiques:', error);
+    }
+}
+
+// Détecter si on est sur une page de correction de liste
+function detectListPage() {
+    // Chercher les éléments caractéristiques d'une page de liste
+    const listInfoDiv = document.querySelector('.onelistInfo');
+    
+    if (listInfoDiv) {
+        // Vérifier qu'on a bien les éléments d'une page de liste
+        const hasEncoderInfo = Array.from(listInfoDiv.querySelectorAll('li')).some(li => 
+            li.textContent.includes('Encodeur :')
+        );
+        
+        if (hasEncoderInfo) {
+            extractListInfo();
+            return currentListInfo !== null;
+        }
+    }
+    
+    return false;
+}
+
+// Extraire les informations de la liste actuelle
+function extractListInfo() {
+    try {
+        const infoDiv = document.querySelector('.onelistInfo');
+        if (!infoDiv) return;
+
+        let encoderName = '';
+        let listReference = '';
+        let level = '';
+
+        // Extraire l'encodeur
+        const encoderLines = infoDiv.querySelectorAll('li');
+        for (const line of encoderLines) {
+            const text = line.textContent.trim();
+            // Vérification précise pour éviter de confondre avec "SuperEncodeur :"
+            if (text.startsWith('Encodeur :') && !text.startsWith('SuperEncodeur :')) {
+                encoderName = text.replace('Encodeur :', '').trim();
+            } else if (text.includes('Code référence :')) {
+                listReference = text.replace('Code référence :', '').trim();
+            } else if (text.includes('Niveau, Classe :')) {
+                const levelText = text.replace('Niveau, Classe :', '').trim().toLowerCase();
+                // Extraire le niveau principal
+                if (levelText.includes('primaire')) level = 'primaire';
+                else if (levelText.includes('maternelle')) level = 'maternelle';
+                else if (levelText.includes('collège') || levelText.includes('college') || levelText.includes('collge')) level = 'collège';
+                else if (levelText.includes('lycée') || levelText.includes('lycee')) level = 'lycée';
+            }
+        }
+
+        if (encoderName && listReference && level) {
+            currentListInfo = {
+                encoderName: encoderName,
+                listReference: listReference,
+                level: level,
+                coefficient: LEVEL_COEFFICIENTS[level] || 1
+            };
+            
+            console.log('[TempoList] Liste détectée:', currentListInfo);
+        }
+    } catch (error) {
+        console.error('[TempoList] Erreur lors de l\'extraction des infos:', error);
+    }
+}
+
+// Mettre en place l'interface utilisateur
+function setupEncoderStatsUI() {
+    if (!currentListInfo) return;
+
+    // Calculer et afficher le score de confiance
+    displayConfidenceScore();
+    
+    // Ajouter les boutons de vote
+    addVotingButtons();
+}
+
+// Afficher le score de confiance
+function displayConfidenceScore() {
+    const encoderName = currentListInfo.encoderName;
+    const score = calculateConfidenceScore(encoderName);
+    
+    // Trouver l'endroit où afficher le score (sous les boutons)
+    const buttonBlock = document.querySelector('.blockListChange');
+    if (!buttonBlock) return;
+
+    // Vérifier si le score existe déjà
+    let scoreDiv = document.getElementById('tempolist-confidence-score');
+    if (!scoreDiv) {
+        scoreDiv = document.createElement('div');
+        scoreDiv.id = 'tempolist-confidence-score';
+        scoreDiv.style.cssText = `
+            margin: 16px auto 8px auto;
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+            max-width: 320px;
+            width: 100%;
+        `;
+        buttonBlock.appendChild(scoreDiv);
+    }
+
+    // Mettre à jour le contenu - NOUVEAU SYSTÈME
+    const stats = encoderStats[encoderName];
+    const totalVotes = stats ? stats.totalVotes : 0;
+    
+    let scoreColor = '#64748b'; // Gris par défaut
+    let scoreText = 'Aucun vote';
+    
+    if (totalVotes > 0) {
+        if (score >= 80) scoreColor = '#059669'; // Vert
+        else if (score >= 60) scoreColor = '#d97706'; // Orange
+        else scoreColor = '#dc2626'; // Rouge
+        scoreText = `${score.toFixed(1)}%`;
+    }
+
+    scoreDiv.innerHTML = `
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+            📊 Score de confiance
+        </div>
+        <div style="font-size: 24px; font-weight: 700; color: ${scoreColor};">
+            ${scoreText}
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+            ${totalVotes} vote${totalVotes > 1 ? 's' : ''} • Niveau: ${currentListInfo.level} (×${currentListInfo.coefficient})
+        </div>
+        <div style="font-size: 13px; color: #475569; margin-top: 6px; font-weight: 500; padding: 4px 8px; background: rgba(71, 85, 105, 0.1); border-radius: 4px;">
+            👤 ${encoderName}
+        </div>
+    `;
+}
+
+// Calculer le score de confiance d'un encodeur - NOUVEAU SYSTÈME
+function calculateConfidenceScore(encoderName) {
+    const stats = encoderStats[encoderName];
+    if (!stats || stats.totalVotes === 0) {
+        return 0; // Aucun vote
+    }
+    
+    return stats.percentage;
+}
+
+// Ajouter les boutons de vote
+function addVotingButtons() {
+    // Vérifier si on a déjà voté pour cette liste - NOUVEAU SYSTÈME
+    const encoderName = currentListInfo.encoderName;
+    const listReference = currentListInfo.listReference;
+    
+    const hasVoted = voteHistory.some(vote => vote.listReference === listReference);
+
+    // Trouver l'endroit où ajouter les boutons
+    const buttonBlock = document.querySelector('.blockListChange');
+    if (!buttonBlock) return;
+
+    // Vérifier si les boutons existent déjà
+    let votingDiv = document.getElementById('tempolist-voting-buttons');
+    if (!votingDiv) {
+        votingDiv = document.createElement('div');
+        votingDiv.id = 'tempolist-voting-buttons';
+        votingDiv.style.cssText = `
+            margin: 12px auto 16px auto;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            max-width: 320px;
+            width: 100%;
+        `;
+        buttonBlock.appendChild(votingDiv);
+    }
+
+    votingDiv.innerHTML = '';
+
+    if (hasVoted) {
+        // Afficher un message et un bouton pour annuler le vote
+        const unlockBtn = document.createElement('button');
+        unlockBtn.innerHTML = '🔓 Annuler le vote';
+        unlockBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #f59e0b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 140px;
+        `;
+        unlockBtn.onmouseover = () => unlockBtn.style.background = '#d97706';
+        unlockBtn.onmouseout = () => unlockBtn.style.background = '#f59e0b';
+        unlockBtn.onclick = () => unlockVote();
+
+        votingDiv.innerHTML = `
+            <div style="
+                padding: 10px 16px;
+                background: #f1f5f9;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                color: #475569;
+                font-size: 14px;
+                text-align: center;
+                font-weight: 500;
+                margin-bottom: 12px;
+                width: 100%;
+            ">
+                ✅ Vous avez déjà voté pour cette liste
+            </div>
+        `;
+        
+        votingDiv.appendChild(unlockBtn);
+        return;
+    }
+
+    // Créer les boutons de vote
+    const positiveBtn = document.createElement('button');
+    positiveBtn.innerHTML = '✅ Liste correcte';
+    positiveBtn.style.cssText = `
+        padding: 10px 16px;
+        background: #059669;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 1;
+        min-width: 140px;
+    `;
+    positiveBtn.onmouseover = () => positiveBtn.style.background = '#047857';
+    positiveBtn.onmouseout = () => positiveBtn.style.background = '#059669';
+    positiveBtn.onclick = () => voteForEncoder(true);
+
+    const negativeBtn = document.createElement('button');
+    negativeBtn.innerHTML = '❌ Liste avec erreurs';
+    negativeBtn.style.cssText = `
+        padding: 10px 16px;
+        background: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 1;
+        min-width: 140px;
+    `;
+    negativeBtn.onmouseover = () => negativeBtn.style.background = '#b91c1c';
+    negativeBtn.onmouseout = () => negativeBtn.style.background = '#dc2626';
+    negativeBtn.onclick = () => voteForEncoder(false);
+
+    votingDiv.appendChild(positiveBtn);
+    votingDiv.appendChild(negativeBtn);
+}
+
+// Annuler un vote pour un encodeur - NOUVEAU SYSTÈME
+async function unlockVote() {
+    try {
+        const listReference = currentListInfo.listReference;
+
+        // Trouver le vote dans l'historique
+        const voteIndex = voteHistory.findIndex(vote => vote.listReference === listReference);
+        if (voteIndex === -1) {
+            alert('Aucun vote à annuler pour cette liste !');
+            return;
+        }
+
+        // Suppression directe sans confirmation
+        const removedVote = voteHistory[voteIndex];
+        
+        // Supprimer de l'historique
+        voteHistory.splice(voteIndex, 1);
+
+        // Recalculer les statistiques à partir de l'historique
+        recalculateStats();
+
+        // Sauvegarder
+        await saveEncoderData();
+
+        // Mettre à jour l'affichage
+        displayConfidenceScore();
+        addVotingButtons();
+
+        // Notification
+        showNotification('Vote annulé ! Vous pouvez voter à nouveau.', 'success');
+        
+        console.log(`[TempoList] Vote annulé pour ${removedVote.encoderName} sur la liste ${listReference}`);
+
+    } catch (error) {
+        console.error('[TempoList] Erreur lors de l\'annulation du vote:', error);
+        showNotification('Erreur lors de l\'annulation du vote', 'error');
+    }
+}
+
+// Enregistrer un vote pour un encodeur - NOUVEAU SYSTÈME
+async function voteForEncoder(isPositive) {
+    try {
+        const encoderName = currentListInfo.encoderName;
+        const listReference = currentListInfo.listReference;
+        const coefficient = currentListInfo.coefficient;
+        const level = currentListInfo.level;
+
+        // Vérifier si on a déjà voté pour cette liste
+        const existingVote = voteHistory.find(vote => vote.listReference === listReference);
+        if (existingVote) {
+            alert('Vous avez déjà voté pour cette liste !');
+            return;
+        }
+
+        // Créer le nouveau vote
+        const newVote = {
+            encoderName: encoderName,
+            listReference: listReference,
+            isPositive: isPositive,
+            level: level,
+            coefficient: coefficient,
+            timestamp: Date.now()
+        };
+
+        // Ajouter à l'historique
+        voteHistory.push(newVote);
+
+        // Mettre à jour les statistiques agrégées
+        if (!encoderStats[encoderName]) {
+            encoderStats[encoderName] = {
+                totalVotes: 0,
+                positiveScore: 0,
+                negativeScore: 0,
+                percentage: 0
+            };
+        }
+
+        const stats = encoderStats[encoderName];
+        stats.totalVotes++;
+        if (isPositive) {
+            stats.positiveScore += coefficient;
+        } else {
+            stats.negativeScore += coefficient;
+        }
+
+        // Recalculer le pourcentage
+        const totalScore = stats.positiveScore + stats.negativeScore;
+        stats.percentage = totalScore > 0 ? (stats.positiveScore / totalScore) * 100 : 0;
+
+        // Sauvegarder dans le storage
+        await saveEncoderData();
+
+        // Mettre à jour l'affichage
+        displayConfidenceScore();
+        addVotingButtons(); // Rafraîchir les boutons
+
+        // Afficher une notification
+        const scoreAfter = stats.percentage;
+        const voteType = isPositive ? 'positive' : 'négative';
+        showNotification(
+            `Vote ${voteType} enregistré ! Score: ${scoreAfter.toFixed(1)}%`,
+            isPositive ? 'success' : 'warning'
+        );
+
+        console.log(`[TempoList] Vote enregistré pour ${encoderName}: ${isPositive ? '+' : '-'}${coefficient}`);
+
+    } catch (error) {
+        console.error('[TempoList] Erreur lors du vote:', error);
+        showNotification('Erreur lors de l\'enregistrement du vote', 'error');
+    }
+}
+
+// Sauvegarder les données dans le storage - NOUVEAU SYSTÈME
+async function saveEncoderData() {
+    try {
+        await chrome.storage.local.set({ 
+            voteHistory: voteHistory,
+            encoderStats: encoderStats 
+        });
+        console.log('[TempoList] Données sauvegardées:', { historyCount: voteHistory.length, statsCount: Object.keys(encoderStats).length });
+    } catch (error) {
+        console.error('[TempoList] Erreur lors de la sauvegarde:', error);
+    }
+}
+
+// Migrer les anciennes données vers le nouveau système
+async function migrateOldData(oldEncoderVotes) {
+    console.log('[TempoList] Migration en cours...', oldEncoderVotes);
+    // On ne peut pas parfaitement migrer car on n'a pas l'historique détaillé
+    // On va juste créer les stats agrégées
+    for (const encoderName in oldEncoderVotes) {
+        const oldData = oldEncoderVotes[encoderName];
+        encoderStats[encoderName] = {
+            totalVotes: (oldData.positiveVotes + oldData.negativeVotes) || 0,
+            positiveScore: oldData.positiveVotes || 0,
+            negativeScore: oldData.negativeVotes || 0,
+            percentage: 0
+        };
+        
+        // Calculer le pourcentage
+        const total = encoderStats[encoderName].positiveScore + encoderStats[encoderName].negativeScore;
+        if (total > 0) {
+            encoderStats[encoderName].percentage = (encoderStats[encoderName].positiveScore / total) * 100;
+        }
+    }
+    
+    await saveEncoderData();
+    console.log('[TempoList] Migration terminée');
+}
+
+// Recalculer les statistiques à partir de l'historique
+function recalculateStats() {
+    // Réinitialiser les stats
+    encoderStats = {};
+    
+    // Parcourir l'historique des votes
+    voteHistory.forEach(vote => {
+        const { encoderName, isPositive, coefficient } = vote;
+        
+        // Initialiser l'encodeur s'il n'existe pas
+        if (!encoderStats[encoderName]) {
+            encoderStats[encoderName] = {
+                totalVotes: 0,
+                positiveScore: 0,
+                negativeScore: 0,
+                percentage: 0
+            };
+        }
+        
+        // Ajouter le vote
+        encoderStats[encoderName].totalVotes++;
+        if (isPositive) {
+            encoderStats[encoderName].positiveScore += coefficient;
+        } else {
+            encoderStats[encoderName].negativeScore += coefficient;
+        }
+    });
+    
+    // Calculer les pourcentages
+    Object.keys(encoderStats).forEach(encoderName => {
+        const stats = encoderStats[encoderName];
+        const totalScore = stats.positiveScore + stats.negativeScore;
+        stats.percentage = totalScore > 0 ? (stats.positiveScore / totalScore) * 100 : 0;
+    });
+    
+    console.log('[TempoList] Statistiques recalculées:', encoderStats);
+}
+
+// Fonction de debug pour afficher les données - accessible depuis la console
+function debugEncoderData() {
+    console.log('=== DONNÉES ENCODEURS DEBUG ===');
+    console.log('Historique des votes:', voteHistory);
+    console.log('Statistiques agrégées:', encoderStats);
+    console.log('Info liste actuelle:', currentListInfo);
+    console.log('Total votes dans l\'historique:', voteHistory.length);
+    console.log('Nombre d\'encodeurs suivis:', Object.keys(encoderStats).length);
+    console.log('===============================');
+    return { voteHistory, encoderStats, currentListInfo };
+}
+
+// Rendre la fonction accessible globalement pour debug
+window.debugTempoListStats = debugEncoderData;
+
+
+
+// Initialiser le système au chargement de la page
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initEncoderStats, 1000); // Attendre que la page soit bien chargée
+    });
+} else {
+    setTimeout(initEncoderStats, 1000);
+}
+
+// Réinitialiser si la page change (SPA)
+let lastUrl = location.href;
+new MutationObserver(() => {
+    const url = location.href;
+    if (url !== lastUrl) {
+        lastUrl = url;
+        currentListInfo = null;
+        setTimeout(initEncoderStats, 1000);
+    }
+}).observe(document, { subtree: true, childList: true });
