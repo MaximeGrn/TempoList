@@ -1422,6 +1422,7 @@ const exclureRefsTaille = [
     '3343604',
     'EXA8519E',
     '3344304',
+    '3346802',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1802,16 +1803,28 @@ const LEVEL_COEFFICIENTS = {
     'lycee': 2.25
 };
 
-// Initialiser le système de statistiques
+// Initialiser le système de statistiques - OPTIMISÉ
 async function initEncoderStats() {
     try {
-        // Vérifier si la fonctionnalité est activée
+        // OPTIMISATION 1: Détecter immédiatement via l'URL au lieu d'attendre le DOM
+        if (!isListPageByURL()) {
+            return; // Pas une page de liste, pas besoin de continuer
+        }
+        
+        // OPTIMISATION 2: Afficher l'UI immédiatement avec un skeleton
         const result = await chrome.storage.local.get(['enableEncoderStats']);
         if (!result.enableEncoderStats) {
             return; // Fonctionnalité désactivée
         }
+        
+        // Extraire les infos de la liste dès que possible
+        extractListInfo();
+        if (currentListInfo) {
+            // Afficher immédiatement l'UI avec un état de chargement
+            setupEncoderStatsUIImmediate();
+        }
 
-        // Charger les données existantes - NOUVEAU SYSTÈME
+        // Charger les données en arrière-plan
         const dataResult = await chrome.storage.local.get(['voteHistory', 'encoderStats']);
         voteHistory = dataResult.voteHistory || [];
         encoderStats = dataResult.encoderStats || {};
@@ -1823,16 +1836,23 @@ async function initEncoderStats() {
             await migrateOldData(oldVotesResult.encoderVotes);
         }
 
-        // Détecter si on est sur une page de liste
-        if (detectListPage()) {
-            setupEncoderStatsUI();
+        // Mettre à jour l'UI avec les vraies données
+        if (currentListInfo) {
+            updateEncoderStatsUIWithData();
         }
     } catch (error) {
         console.error('[TempoList] Erreur lors de l\'initialisation des statistiques:', error);
     }
 }
 
-// Détecter si on est sur une page de correction de liste
+// OPTIMISATION: Détecter une page de liste via l'URL (plus rapide)
+function isListPageByURL() {
+    const url = window.location.href;
+    // Pattern: https://crealiste.com/encodeur/listeFournitures/148469
+    return url.includes('/encodeur/listeFournitures/') || url.includes('/encodeur/listeLibrairie/');
+}
+
+// Détecter si on est sur une page de correction de liste (méthode DOM - backup)
 function detectListPage() {
     // Chercher les éléments caractéristiques d'une page de liste
     const listInfoDiv = document.querySelector('.onelistInfo');
@@ -1896,7 +1916,27 @@ function extractListInfo() {
     }
 }
 
-// Mettre en place l'interface utilisateur
+// OPTIMISÉ: Afficher immédiatement l'UI avec un skeleton
+function setupEncoderStatsUIImmediate() {
+    if (!currentListInfo) return;
+
+    // Afficher immédiatement le bloc avec état de chargement
+    displayConfidenceScoreSkeleton();
+    
+    // Afficher immédiatement les boutons avec état de chargement
+    addVotingButtonsSkeleton();
+}
+
+// OPTIMISÉ: Mettre à jour l'UI avec les vraies données
+function updateEncoderStatsUIWithData() {
+    if (!currentListInfo) return;
+
+    // Mettre à jour avec les vraies données
+    displayConfidenceScore();
+    addVotingButtons();
+}
+
+// Mettre en place l'interface utilisateur (ancienne méthode - conservée pour compatibilité)
 function setupEncoderStatsUI() {
     if (!currentListInfo) return;
 
@@ -1907,7 +1947,52 @@ function setupEncoderStatsUI() {
     addVotingButtons();
 }
 
-// Afficher le score de confiance
+// SKELETON: Afficher immédiatement le score avec un état de chargement
+function displayConfidenceScoreSkeleton() {
+    const encoderName = currentListInfo.encoderName;
+    
+    // Trouver l'endroit où afficher le score (sous les boutons)
+    const buttonBlock = document.querySelector('.blockListChange');
+    if (!buttonBlock) return;
+
+    // Créer le bloc de score avec skeleton
+    let scoreDiv = document.getElementById('tempolist-confidence-score');
+    if (!scoreDiv) {
+        scoreDiv = document.createElement('div');
+        scoreDiv.id = 'tempolist-confidence-score';
+        scoreDiv.style.cssText = `
+            margin: 16px auto 8px auto;
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+            max-width: 320px;
+            width: 100%;
+        `;
+        buttonBlock.appendChild(scoreDiv);
+    }
+
+    // Afficher le skeleton avec animation de chargement
+    scoreDiv.innerHTML = `
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+            📊 Score de confiance
+        </div>
+        <div style="font-size: 24px; font-weight: 700; color: #64748b;">
+            Chargement...
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+            Calcul en cours • Niveau: ${currentListInfo.level} (×${currentListInfo.coefficient})
+        </div>
+        <div style="font-size: 13px; color: #475569; margin-top: 6px; font-weight: 500; padding: 4px 8px; background: rgba(71, 85, 105, 0.1); border-radius: 4px;">
+            👤 ${encoderName}
+        </div>
+    `;
+}
+
+// Afficher le score de confiance avec les vraies données
 function displayConfidenceScore() {
     const encoderName = currentListInfo.encoderName;
     const score = calculateConfidenceScore(encoderName);
@@ -1976,7 +2061,74 @@ function calculateConfidenceScore(encoderName) {
     return stats.percentage;
 }
 
-// Ajouter les boutons de vote
+// SKELETON: Afficher immédiatement les boutons avec état de chargement
+function addVotingButtonsSkeleton() {
+    // Trouver l'endroit où ajouter les boutons
+    const buttonBlock = document.querySelector('.blockListChange');
+    if (!buttonBlock) return;
+
+    // Créer le container des boutons
+    let votingDiv = document.getElementById('tempolist-voting-buttons');
+    if (!votingDiv) {
+        votingDiv = document.createElement('div');
+        votingDiv.id = 'tempolist-voting-buttons';
+        votingDiv.style.cssText = `
+            margin: 12px auto 16px auto;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            max-width: 320px;
+            width: 100%;
+        `;
+        buttonBlock.appendChild(votingDiv);
+    }
+
+    // Afficher des boutons skeleton en attendant les données (ordre: Erreurs puis Correcte)
+    votingDiv.innerHTML = `
+        <button style="
+            padding: 10px 16px;
+            background: #e2e8f0;
+            color: #64748b;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 140px;
+            opacity: 0.7;
+            cursor: wait;
+        " disabled>
+            <div style="width: 16px; height: 16px; background: #cbd5e1; border-radius: 3px;"></div>
+            Erreurs...
+        </button>
+        <button style="
+            padding: 10px 16px;
+            background: #e2e8f0;
+            color: #64748b;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 140px;
+            opacity: 0.7;
+            cursor: wait;
+        " disabled>
+            <div style="width: 16px; height: 16px; background: #cbd5e1; border-radius: 3px;"></div>
+            Correcte...
+        </button>
+    `;
+}
+
+// Ajouter les boutons de vote avec nouveaux designs
 function addVotingButtons() {
     // Vérifier si on a déjà voté pour cette liste - NOUVEAU SYSTÈME
     const encoderName = currentListInfo.encoderName;
@@ -2007,11 +2159,42 @@ function addVotingButtons() {
     votingDiv.innerHTML = '';
 
     if (hasVoted) {
-        // Afficher un message et un bouton pour annuler le vote
+        // Message "Vous avez déjà voté" avec nouveau design
+        const votedMessage = document.createElement('div');
+        votedMessage.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4 0a2 2 0 0 0-2 2v1.133l-.941.502A2 2 0 0 0 0 5.4V14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5.4a2 2 0 0 0-1.059-1.765L14 3.133V2a2 2 0 0 0-2-2zm10 4.267.47.25A1 1 0 0 1 15 5.4v.817l-1 .6zm-1 3.15-3.75 2.25L8 8.917l-1.25.75L3 7.417V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1zm-11-.6-1-.6V5.4a1 1 0 0 1 .53-.882L2 4.267zm13 .566v5.734l-4.778-2.867zm-.035 6.88A1 1 0 0 1 14 15H2a1 1 0 0 1-.965-.738L8 10.083zM1 13.116V7.383l4.778 2.867L1 13.117Z"/>
+            </svg>
+            Vous avez déjà voté
+        `;
+        votedMessage.style.cssText = `
+            padding: 10px 16px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            color: #475569;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 500;
+            margin-bottom: 12px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        `;
+
+        // Bouton "Annuler" avec nouveau design - HAUTEUR HARMONISÉE
         const unlockBtn = document.createElement('button');
-        unlockBtn.innerHTML = '🔓 Annuler le vote';
+        unlockBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
+            </svg>
+            Annuler
+        `;
         unlockBtn.style.cssText = `
-            padding: 10px 20px;
+            padding: 10px 16px;
             background: #f59e0b;
             color: white;
             border: none;
@@ -2023,7 +2206,7 @@ function addVotingButtons() {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             flex: 1;
             min-width: 140px;
         `;
@@ -2031,30 +2214,20 @@ function addVotingButtons() {
         unlockBtn.onmouseout = () => unlockBtn.style.background = '#f59e0b';
         unlockBtn.onclick = () => unlockVote();
 
-        votingDiv.innerHTML = `
-            <div style="
-                padding: 10px 16px;
-                background: #f1f5f9;
-                border: 1px solid #cbd5e1;
-                border-radius: 8px;
-                color: #475569;
-                font-size: 14px;
-                text-align: center;
-                font-weight: 500;
-                margin-bottom: 12px;
-                width: 100%;
-            ">
-                ✅ Vous avez déjà voté pour cette liste
-            </div>
-        `;
-        
+        votingDiv.appendChild(votedMessage);
         votingDiv.appendChild(unlockBtn);
         return;
     }
 
-    // Créer les boutons de vote
+    // INVERSION: Bouton "Correcte" EN PREMIER (avant c'était en second)
     const positiveBtn = document.createElement('button');
-    positiveBtn.innerHTML = '✅ Liste correcte';
+    positiveBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M10.854 8.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
+          <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
+        </svg>
+        Correcte
+    `;
     positiveBtn.style.cssText = `
         padding: 10px 16px;
         background: #059669;
@@ -2068,7 +2241,7 @@ function addVotingButtons() {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 8px;
         flex: 1;
         min-width: 140px;
     `;
@@ -2076,8 +2249,15 @@ function addVotingButtons() {
     positiveBtn.onmouseout = () => positiveBtn.style.background = '#059669';
     positiveBtn.onclick = () => voteForEncoder(true);
 
+    // INVERSION: Bouton "Erreurs" EN SECOND (avant c'était en premier)
     const negativeBtn = document.createElement('button');
-    negativeBtn.innerHTML = '❌ Liste avec erreurs';
+    negativeBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M6.146 8.146a.5.5 0 0 1 .708 0L8 9.293l1.146-1.147a.5.5 0 1 1 .708.708L8.707 10l1.147 1.146a.5.5 0 0 1-.708.708L8 10.707l-1.146 1.147a.5.5 0 0 1-.708-.708L7.293 10 6.146 8.854a.5.5 0 0 1 0-.708"/>
+          <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
+        </svg>
+        Erreurs
+    `;
     negativeBtn.style.cssText = `
         padding: 10px 16px;
         background: #dc2626;
@@ -2091,7 +2271,7 @@ function addVotingButtons() {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 8px;
         flex: 1;
         min-width: 140px;
     `;
@@ -2099,8 +2279,9 @@ function addVotingButtons() {
     negativeBtn.onmouseout = () => negativeBtn.style.background = '#dc2626';
     negativeBtn.onclick = () => voteForEncoder(false);
 
-    votingDiv.appendChild(positiveBtn);
+    // INVERSION: Ajouter d'abord "Erreurs" puis "Correcte" (Erreurs à gauche, Correcte à droite)
     votingDiv.appendChild(negativeBtn);
+    votingDiv.appendChild(positiveBtn);
 }
 
 // Annuler un vote pour un encodeur - NOUVEAU SYSTÈME
@@ -2308,22 +2489,22 @@ window.debugTempoListStats = debugEncoderData;
 
 
 
-// Initialiser le système au chargement de la page
+// OPTIMISÉ: Initialiser le système rapidement avec affichage immédiat
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(initEncoderStats, 1000); // Attendre que la page soit bien chargée
+        setTimeout(initEncoderStats, 100); // Réduit de 1000ms à 100ms grâce à l'optimisation
     });
 } else {
-    setTimeout(initEncoderStats, 1000);
+    setTimeout(initEncoderStats, 100); // Réduit de 1000ms à 100ms grâce à l'optimisation
 }
 
-// Réinitialiser si la page change (SPA)
+// Réinitialiser si la page change (SPA) - OPTIMISÉ
 let lastUrl = location.href;
 new MutationObserver(() => {
     const url = location.href;
     if (url !== lastUrl) {
         lastUrl = url;
         currentListInfo = null;
-        setTimeout(initEncoderStats, 1000);
+        setTimeout(initEncoderStats, 100); // Réduit de 1000ms à 100ms grâce à l'optimisation
     }
 }).observe(document, { subtree: true, childList: true });
