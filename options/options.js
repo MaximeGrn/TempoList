@@ -48,6 +48,25 @@ function setupEventListeners() {
     document.getElementById('enableTableStats').addEventListener('change', handleTableStatsChange);
     document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
     document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
+    
+    // Event listeners pour les switches visuels
+    document.getElementById('enableEncoderStatsToggle').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!this.classList.contains('disabled')) {
+            const checkbox = document.getElementById('enableEncoderStats');
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+    });
+    
+    document.getElementById('enableTableStatsToggle').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!this.classList.contains('disabled')) {
+            const checkbox = document.getElementById('enableTableStats');
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+    });
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
     document.getElementById('dateFilterBtn').addEventListener('click', openDatePicker);
     document.getElementById('resetStatsBtn').addEventListener('click', resetAllStats);
@@ -159,6 +178,27 @@ function handleAssistModeChange() {
         modernRadioGroup.setAttribute('data-value', mode);
     }
     
+    // Gérer l'état des switches selon le mode d'assistance
+    const isAssistEnabled = mode !== 'none';
+    setSwitchEnabled('enableEncoderStats', isAssistEnabled);
+    setSwitchEnabled('enableTableStats', isAssistEnabled);
+    
+    // Si le mode d'assistance est désactivé, désactiver aussi les switches
+    if (!isAssistEnabled) {
+        if (document.getElementById('enableEncoderStats').checked) {
+            document.getElementById('enableEncoderStats').checked = false;
+            updateSwitchAppearance('enableEncoderStats', false);
+            chrome.storage.local.set({ enableEncoderStats: false });
+        }
+        if (document.getElementById('enableTableStats').checked) {
+            document.getElementById('enableTableStats').checked = false;
+            updateSwitchAppearance('enableTableStats', false);
+            chrome.storage.local.set({ enableTableStats: false });
+        }
+        // Cacher l'option du tableau des stats
+        document.getElementById('tableStatsOption').style.display = 'none';
+    }
+    
     // Sauvegarder immédiatement
     chrome.storage.local.set({ assistMode: mode }, () => {
         showNotification(message, notificationType);
@@ -192,11 +232,42 @@ function handleSpeedModeChange() {
     currentAutomationConfig = { ...SPEED_PRESETS[speed] };
 }
 
+// Fonctions utilitaires pour les switches
+function updateSwitchAppearance(switchId, isChecked) {
+    const switchToggle = document.getElementById(switchId + 'Toggle');
+    if (switchToggle) {
+        if (isChecked) {
+            switchToggle.classList.add('checked');
+        } else {
+            switchToggle.classList.remove('checked');
+        }
+    }
+}
+
+function setSwitchEnabled(switchId, isEnabled) {
+    const switchElement = document.getElementById(switchId + 'Switch');
+    const switchToggle = document.getElementById(switchId + 'Toggle');
+    const switchInput = document.getElementById(switchId);
+    
+    if (isEnabled) {
+        switchElement.classList.remove('disabled');
+        switchToggle.classList.remove('disabled');
+        switchInput.disabled = false;
+    } else {
+        switchElement.classList.add('disabled');
+        switchToggle.classList.add('disabled');
+        switchInput.disabled = true;
+    }
+}
+
 function handleEncoderStatsChange() {
     const isEnabled = document.getElementById('enableEncoderStats').checked;
     const tableStatsOption = document.getElementById('tableStatsOption');
     const message = isEnabled ? 'Statistiques encodeurs activées !' : 'Statistiques encodeurs désactivées !';
     const notificationType = isEnabled ? 'success' : 'warning';
+    
+    // Mettre à jour l'apparence du switch
+    updateSwitchAppearance('enableEncoderStats', isEnabled);
     
     // Afficher/cacher l'option des stats dans le tableau selon l'activation des stats générales
     if (isEnabled) {
@@ -205,6 +276,7 @@ function handleEncoderStatsChange() {
         tableStatsOption.style.display = 'none';
         // Désactiver aussi les stats du tableau si les stats générales sont désactivées
         document.getElementById('enableTableStats').checked = false;
+        updateSwitchAppearance('enableTableStats', false);
         chrome.storage.local.set({ enableTableStats: false });
     }
     
@@ -219,6 +291,9 @@ function handleTableStatsChange() {
     const isEnabled = document.getElementById('enableTableStats').checked;
     const message = isEnabled ? 'Affichage dans les listes à valider activé !' : 'Affichage dans les listes à valider désactivé !';
     const notificationType = isEnabled ? 'success' : 'info';
+    
+    // Mettre à jour l'apparence du switch
+    updateSwitchAppearance('enableTableStats', isEnabled);
     
     chrome.storage.local.set({ enableTableStats: isEnabled }, () => {
         showNotification(message, notificationType);
@@ -244,14 +319,21 @@ async function loadSettings() {
     // Charger les statistiques encodeurs
     const isEncoderStatsEnabled = result.enableEncoderStats || false;
     document.getElementById('enableEncoderStats').checked = isEncoderStatsEnabled;
+    updateSwitchAppearance('enableEncoderStats', isEncoderStatsEnabled);
     
     // Charger l'option d'affichage dans les listes à valider
     const isTableStatsEnabled = result.enableTableStats || false;
     document.getElementById('enableTableStats').checked = isTableStatsEnabled;
+    updateSwitchAppearance('enableTableStats', isTableStatsEnabled);
+    
+    // Gérer l'état des switches selon le mode d'assistance
+    const isAssistEnabled = mode !== 'none';
+    setSwitchEnabled('enableEncoderStats', isAssistEnabled);
+    setSwitchEnabled('enableTableStats', isAssistEnabled);
     
     // Afficher/cacher l'option tableau selon l'activation des stats générales
     const tableStatsOption = document.getElementById('tableStatsOption');
-    if (isEncoderStatsEnabled) {
+    if (isEncoderStatsEnabled && isAssistEnabled) {
         tableStatsOption.style.display = 'block';
     } else {
         tableStatsOption.style.display = 'none';
