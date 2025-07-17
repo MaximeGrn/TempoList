@@ -45,6 +45,7 @@ function setupEventListeners() {
     
     // Statistiques encodeurs
     document.getElementById('enableEncoderStats').addEventListener('change', handleEncoderStatsChange);
+    document.getElementById('enableTableStats').addEventListener('change', handleTableStatsChange);
     document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
     document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
@@ -193,8 +194,19 @@ function handleSpeedModeChange() {
 
 function handleEncoderStatsChange() {
     const isEnabled = document.getElementById('enableEncoderStats').checked;
+    const tableStatsOption = document.getElementById('tableStatsOption');
     const message = isEnabled ? 'Statistiques encodeurs activées !' : 'Statistiques encodeurs désactivées !';
     const notificationType = isEnabled ? 'success' : 'warning';
+    
+    // Afficher/cacher l'option des stats dans le tableau selon l'activation des stats générales
+    if (isEnabled) {
+        tableStatsOption.style.display = 'block';
+    } else {
+        tableStatsOption.style.display = 'none';
+        // Désactiver aussi les stats du tableau si les stats générales sont désactivées
+        document.getElementById('enableTableStats').checked = false;
+        chrome.storage.local.set({ enableTableStats: false });
+    }
     
     // Sauvegarder immédiatement
     chrome.storage.local.set({ enableEncoderStats: isEnabled }, () => {
@@ -202,9 +214,20 @@ function handleEncoderStatsChange() {
     });
 }
 
+// Gestion des statistiques dans les listes à valider
+function handleTableStatsChange() {
+    const isEnabled = document.getElementById('enableTableStats').checked;
+    const message = isEnabled ? 'Affichage dans les listes à valider activé !' : 'Affichage dans les listes à valider désactivé !';
+    const notificationType = isEnabled ? 'success' : 'info';
+    
+    chrome.storage.local.set({ enableTableStats: isEnabled }, () => {
+        showNotification(message, notificationType);
+    });
+}
+
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
-    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats']);
+    const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats', 'enableTableStats']);
     
     teams = result.teams || [];
     dailyTarget = result.dailyTarget || 40;
@@ -221,6 +244,18 @@ async function loadSettings() {
     // Charger les statistiques encodeurs
     const isEncoderStatsEnabled = result.enableEncoderStats || false;
     document.getElementById('enableEncoderStats').checked = isEncoderStatsEnabled;
+    
+    // Charger l'option d'affichage dans les listes à valider
+    const isTableStatsEnabled = result.enableTableStats || false;
+    document.getElementById('enableTableStats').checked = isTableStatsEnabled;
+    
+    // Afficher/cacher l'option tableau selon l'activation des stats générales
+    const tableStatsOption = document.getElementById('tableStatsOption');
+    if (isEncoderStatsEnabled) {
+        tableStatsOption.style.display = 'block';
+    } else {
+        tableStatsOption.style.display = 'none';
+    }
     
     // Mettre à jour le slider animé
     const modernRadioGroup = document.querySelector('.modern-radio-group');

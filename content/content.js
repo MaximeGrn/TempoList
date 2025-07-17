@@ -1423,6 +1423,8 @@ const exclureRefsTaille = [
     'EXA8519E',
     '3344304',
     '3346802',
+    '3342802',
+    'CLA03-0024',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -1806,24 +1808,20 @@ const LEVEL_COEFFICIENTS = {
 // Initialiser le système de statistiques - OPTIMISÉ
 async function initEncoderStats() {
     try {
-        // OPTIMISATION 1: Détecter immédiatement via l'URL au lieu d'attendre le DOM
-        if (!isListPageByURL()) {
-            return; // Pas une page de liste, pas besoin de continuer
+        // OPTIMISATION 1: Détecter le type de page via l'URL
+        const isListPage = isListPageByURL();
+        const isValidationTablePage = isValidationTablePageByURL();
+        
+        if (!isListPage && !isValidationTablePage) {
+            return; // Pas une page concernée par les statistiques
         }
         
-        // OPTIMISATION 2: Afficher l'UI immédiatement avec un skeleton
-        const result = await chrome.storage.local.get(['enableEncoderStats']);
+        // Vérifier les options activées
+        const result = await chrome.storage.local.get(['enableEncoderStats', 'enableTableStats']);
         if (!result.enableEncoderStats) {
             return; // Fonctionnalité désactivée
         }
         
-        // Extraire les infos de la liste dès que possible
-        extractListInfo();
-        if (currentListInfo) {
-            // Afficher immédiatement l'UI avec un état de chargement
-            setupEncoderStatsUIImmediate();
-        }
-
         // Charger les données en arrière-plan
         const dataResult = await chrome.storage.local.get(['voteHistory', 'encoderStats']);
         voteHistory = dataResult.voteHistory || [];
@@ -1836,9 +1834,17 @@ async function initEncoderStats() {
             await migrateOldData(oldVotesResult.encoderVotes);
         }
 
-        // Mettre à jour l'UI avec les vraies données
-        if (currentListInfo) {
-            updateEncoderStatsUIWithData();
+        // TRAITEMENT SELON LE TYPE DE PAGE
+        if (isListPage) {
+            // Page de liste individuelle - comportement existant
+            extractListInfo();
+            if (currentListInfo) {
+                setupEncoderStatsUIImmediate();
+                updateEncoderStatsUIWithData();
+            }
+        } else if (isValidationTablePage && result.enableTableStats) {
+            // Page des listes à valider - nouveau comportement
+            setupValidationTableStats();
         }
     } catch (error) {
         console.error('[TempoList] Erreur lors de l\'initialisation des statistiques:', error);
@@ -1850,6 +1856,13 @@ function isListPageByURL() {
     const url = window.location.href;
     // Pattern: https://crealiste.com/encodeur/listeFournitures/148469
     return url.includes('/encodeur/listeFournitures/') || url.includes('/encodeur/listeLibrairie/');
+}
+
+// NOUVEAU: Détecter la page des listes à valider
+function isValidationTablePageByURL() {
+    const url = window.location.href;
+    // Pattern: https://crealiste.com/encodeur/listesAValider
+    return url.includes('/encodeur/listesAValider');
 }
 
 // Détecter si on est sur une page de correction de liste (méthode DOM - backup)
@@ -2488,6 +2501,190 @@ function debugEncoderData() {
 window.debugTempoListStats = debugEncoderData;
 
 
+
+// === GESTION DES STATISTIQUES DANS LE TABLEAU DES LISTES À VALIDER ===
+
+// Configuration pour analyser le tableau avec surveillance des changements dynamiques
+function setupValidationTableStats() {
+    console.log('[TempoList] Configuration des statistiques pour le tableau des listes à valider');
+    
+    // Attendre que le tableau soit chargé
+    const checkTableLoaded = () => {
+        const tableBody = document.querySelector('tbody.listesTable');
+        if (tableBody && tableBody.children.length > 0) {
+            processValidationTable(tableBody);
+            setupTableObserver(tableBody);
+        } else {
+            // Réessayer dans 500ms si le tableau n'est pas encore chargé
+            setTimeout(checkTableLoaded, 500);
+        }
+    };
+    
+    checkTableLoaded();
+}
+
+// Surveiller les changements dynamiques du tableau (sélection super-encodeur)
+function setupTableObserver(tableBody) {
+    // Éviter les observateurs multiples
+    if (tableBody.hasAttribute('data-tempolist-observer')) {
+        return;
+    }
+    tableBody.setAttribute('data-tempolist-observer', 'true');
+    
+    console.log('[TempoList] Installation de l\'observateur de changements du tableau');
+    
+    // Variable pour le debounce (éviter trop de traitements)
+    let reprocessTimeout = null;
+    
+    const observer = new MutationObserver((mutations) => {
+        let shouldReprocess = false;
+        
+        // Vérifier si le contenu du tableau a changé significativement
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                // Si des lignes ont été ajoutées/supprimées
+                if (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0) {
+                    shouldReprocess = true;
+                }
+            }
+        });
+        
+        if (shouldReprocess) {
+            console.log('[TempoList] Changement détecté dans le tableau...');
+            
+            // Annuler le traitement précédent s'il existe (debounce)
+            if (reprocessTimeout) {
+                clearTimeout(reprocessTimeout);
+            }
+            
+            // Programmer un nouveau traitement avec délai
+            reprocessTimeout = setTimeout(() => {
+                console.log('[TempoList] Retraitement des statistiques après stabilisation');
+                processValidationTable(tableBody);
+                reprocessTimeout = null;
+            }, 500); // Délai augmenté pour plus de stabilité
+        }
+    });
+    
+    // Observer les changements avec des options appropriées
+    observer.observe(tableBody, {
+        childList: true,
+        subtree: true
+    });
+    
+    console.log('[TempoList] Observateur installé avec succès');
+}
+
+// Traiter le tableau des listes à valider avec protection contre les erreurs
+function processValidationTable(tableBody) {
+    try {
+        console.log('[TempoList] Traitement du tableau des listes à valider');
+        
+        // Vérification de sécurité
+        if (!tableBody || !tableBody.children) {
+            console.warn('[TempoList] Tableau invalide, arrêt du traitement');
+            return;
+        }
+        
+        const rows = Array.from(tableBody.children);
+        let currentEncoder = null;
+        let processedCount = 0;
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            
+            // Protection supplémentaire
+            if (!row || !row.children) {
+                continue;
+            }
+            
+            // Vérifier si c'est une ligne d'en-tête (contient les infos de l'encodeur)
+            if (row.children.length === 1 && row.children[0] && row.children[0].getAttribute('colspan') === '8') {
+                // Extraire le nom de l'encodeur de cette ligne
+                const cellContent = row.children[0].textContent || '';
+                const encoderMatch = cellContent.match(/Encodeur\s*:\s*([^,]+)/);
+                if (encoderMatch && encoderMatch[1]) {
+                    currentEncoder = encoderMatch[1].trim();
+                    console.log('[TempoList] Encodeur détecté:', currentEncoder);
+                }
+            } 
+            // Vérifier si c'est une ligne de données (6 cellules ou plus)
+            else if (row.children.length >= 6 && currentEncoder) {
+                // Trouver la cellule dateCreate pour y ajouter les statistiques
+                const dateCreateCell = row.querySelector('td.dateCreate');
+                if (dateCreateCell) {
+                    addEncoderStatsToTableRow(dateCreateCell, currentEncoder);
+                    processedCount++;
+                }
+            }
+        }
+        
+        console.log(`[TempoList] Traitement terminé: ${processedCount} blocs de statistiques traités`);
+        
+    } catch (error) {
+        console.error('[TempoList] Erreur lors du traitement du tableau:', error);
+        // Ne pas faire planter l'application, continuer silencieusement
+    }
+}
+
+// Ajouter les statistiques d'un encodeur à une ligne du tableau
+function addEncoderStatsToTableRow(dateCreateCell, encoderName) {
+    // Vérifier si les stats ont déjà été ajoutées
+    if (dateCreateCell.querySelector('.tempolist-table-stats')) {
+        return;
+    }
+    
+    // Calculer les statistiques de l'encodeur
+    const score = calculateConfidenceScore(encoderName);
+    const stats = encoderStats[encoderName];
+    const totalVotes = stats ? stats.totalVotes : 0;
+    
+    // Déterminer la couleur du score
+    let scoreColor = '#64748b'; // Gris par défaut
+    let scoreText = 'Aucun vote';
+    
+    if (totalVotes > 0) {
+        if (score >= 80) scoreColor = '#059669'; // Vert
+        else if (score >= 60) scoreColor = '#d97706'; // Orange
+        else scoreColor = '#dc2626'; // Rouge
+        scoreText = `${score.toFixed(1)}%`;
+    }
+    
+    // Créer le bloc de statistiques (version allégée pour le tableau)
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'tempolist-table-stats';
+    statsDiv.style.cssText = `
+        margin-top: 12px;
+        padding: 10px 14px;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        font-size: 12px;
+    `;
+    
+    statsDiv.innerHTML = `
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 3px; font-size: 13px;">
+            📊 Score de confiance
+        </div>
+        <div style="font-size: 20px; font-weight: 700; color: ${scoreColor};">
+            ${scoreText}
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 3px;">
+            ${totalVotes} vote${totalVotes > 1 ? 's' : ''}
+        </div>
+        <div style="font-size: 13px; color: #475569; margin-top: 5px; font-weight: 500; padding: 3px 8px; background: rgba(71, 85, 105, 0.1); border-radius: 4px;">
+            👤 ${encoderName}
+        </div>
+    `;
+    
+    // Ajouter le bloc à la cellule
+    dateCreateCell.appendChild(statsDiv);
+    
+    console.log(`[TempoList] Statistiques ajoutées pour ${encoderName}: ${scoreText} (${totalVotes} votes)`);
+}
 
 // OPTIMISÉ: Initialiser le système rapidement avec affichage immédiat
 if (document.readyState === 'loading') {
