@@ -1421,6 +1421,7 @@ const exclureRefsTaille = [
     '3099408',
     '3343604',
     'EXA8519E',
+    '3344304',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
