@@ -12,6 +12,11 @@ let teams = [];
 let currentEditingTeam = null;
 let dailyTarget = 40;
 
+// Variables pour le filtrage par date
+let selectedFilterDate = null; // null = toutes les dates
+let currentCalendarDate = new Date(); // Date affichée dans le calendrier
+let dateFilterMode = 'all'; // 'all' ou 'specific'
+
 // Initialisation de la page options
 async function initializeOptions() {
     try {
@@ -43,7 +48,17 @@ function setupEventListeners() {
     document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
     document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
+    document.getElementById('dateFilterBtn').addEventListener('click', openDatePicker);
     document.getElementById('resetStatsBtn').addEventListener('click', resetAllStats);
+    
+    // Modal de sélection de date
+    document.getElementById('closeDatePickerBtn').addEventListener('click', closeDatePicker);
+    document.getElementById('cancelDatePickerBtn').addEventListener('click', closeDatePicker);
+    document.getElementById('applyDateFilterBtn').addEventListener('click', applyDateFilter);
+    document.getElementById('showAllDatesBtn').addEventListener('click', () => toggleDateFilterMode('all'));
+    document.getElementById('selectSpecificDateBtn').addEventListener('click', () => toggleDateFilterMode('specific'));
+    document.getElementById('prevMonthBtn').addEventListener('click', () => navigateMonth(-1));
+    document.getElementById('nextMonthBtn').addEventListener('click', () => navigateMonth(1));
     
     // === GESTION DU POPUP MODAL DES ÉQUIPES ===
     
@@ -682,18 +697,37 @@ async function openDataViewer() {
     chrome.tabs.create({ url: dataViewerUrl });
 }
 
-// Charger et afficher les statistiques - NOUVEAU SYSTÈME
+// Charger et afficher les statistiques - NOUVEAU SYSTÈME avec filtrage par date
 async function loadAndDisplayStats() {
     try {
         const result = await chrome.storage.local.get(['voteHistory', 'encoderStats']);
-        const voteHistory = result.voteHistory || [];
+        let voteHistory = result.voteHistory || [];
         const encoderStats = result.encoderStats || {};
         
-        // Si pas de données
-        if (Object.keys(encoderStats).length === 0) {
+        // Filtrer par date si nécessaire
+        if (selectedFilterDate) {
+            voteHistory = filterVotesByDate(voteHistory, selectedFilterDate);
+        }
+        
+        // Si pas de données après filtrage
+        if (voteHistory.length === 0) {
             document.getElementById('noStatsMessage').style.display = 'block';
             document.querySelector('.stats-summary').style.display = 'none';
             document.querySelector('.encoders-ranking').style.display = 'none';
+            
+            // Message adapté selon le filtre
+            const noStatsMsg = document.getElementById('noStatsMessage');
+            if (selectedFilterDate) {
+                const dateStr = formatDateForDisplay(selectedFilterDate);
+                noStatsMsg.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-calendar-x" viewBox="0 0 16 16" style="opacity: 0.3;">
+                      <path d="M6.146 7.146a.5.5 0 0 1 .708 0L8 8.293l1.146-1.147a.5.5 0 1 1 .708.708L8.707 9l1.147 1.146a.5.5 0 0 1-.708.708L8 9.707l-1.146 1.147a.5.5 0 0 1-.708-.708L7.293 9 6.146 7.854a.5.5 0 0 1 0-.708"/>
+                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5h16V4H0V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5"/>
+                    </svg>
+                    <h3>Aucun vote pour le ${dateStr}</h3>
+                    <p>Il n'y a pas de votes enregistrés pour cette date spécifique.</p>
+                `;
+            }
             return;
         }
 
@@ -702,8 +736,11 @@ async function loadAndDisplayStats() {
         document.querySelector('.stats-summary').style.display = 'grid';
         document.querySelector('.encoders-ranking').style.display = 'block';
 
+        // Recalculer les statistiques avec les données filtrées
+        const filteredEncoderStats = recalculateStatsFromFilteredHistory(voteHistory);
+        
         // Calculer les statistiques globales
-        const stats = calculateGlobalStats(voteHistory, encoderStats);
+        const stats = calculateGlobalStats(voteHistory, filteredEncoderStats);
         
         // Mettre à jour l'affichage des statistiques générales
         document.getElementById('totalEncoders').textContent = stats.totalEncoders;
@@ -711,7 +748,7 @@ async function loadAndDisplayStats() {
         document.getElementById('avgScore').textContent = stats.avgScore + '%';
 
         // Générer le classement des encodeurs
-        generateEncodersRanking(voteHistory, encoderStats);
+        generateEncodersRanking(voteHistory, filteredEncoderStats);
 
     } catch (error) {
         console.error('Erreur lors du chargement des statistiques:', error);
@@ -845,6 +882,9 @@ document.addEventListener('click', (e) => {
     if (e.target.id === 'statsModal') {
         closeStatsModal();
     }
+    if (e.target.id === 'datePickerModal') {
+        closeDatePicker();
+    }
 });
 
 // Échapper pour fermer la modal des stats
@@ -852,4 +892,240 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.getElementById('statsModal').classList.contains('show')) {
         closeStatsModal();
     }
-}); 
+    if (e.key === 'Escape' && document.getElementById('datePickerModal').classList.contains('show')) {
+        closeDatePicker();
+    }
+});
+
+// === GESTION DU FILTRAGE PAR DATE ===
+
+// Ouvrir le modal de sélection de date
+function openDatePicker() {
+    // Réinitialiser le calendrier à la date actuelle
+    currentCalendarDate = new Date();
+    
+    // Mettre à jour l'affichage initial
+    updateDateFilterMode();
+    updateCalendarDisplay();
+    
+    // Afficher le modal
+    const modal = document.getElementById('datePickerModal');
+    modal.classList.add('show');
+}
+
+// Fermer le modal de sélection de date
+function closeDatePicker() {
+    const modal = document.getElementById('datePickerModal');
+    modal.classList.remove('show');
+}
+
+// Basculer le mode de filtre (toutes dates / date spécifique)
+function toggleDateFilterMode(mode) {
+    dateFilterMode = mode;
+    updateDateFilterMode();
+}
+
+// Mettre à jour l'interface selon le mode de filtre
+function updateDateFilterMode() {
+    const allDatesBtn = document.getElementById('showAllDatesBtn');
+    const specificDateBtn = document.getElementById('selectSpecificDateBtn');
+    const calendarContainer = document.getElementById('calendarContainer');
+    
+    // Mettre à jour les boutons
+    allDatesBtn.classList.toggle('active', dateFilterMode === 'all');
+    specificDateBtn.classList.toggle('active', dateFilterMode === 'specific');
+    
+    // Afficher/cacher le calendrier
+    calendarContainer.style.display = dateFilterMode === 'specific' ? 'block' : 'none';
+    
+    // Mettre à jour le texte d'information
+    updateSelectedDateInfo();
+}
+
+// Naviguer dans les mois du calendrier
+function navigateMonth(direction) {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+    updateCalendarDisplay();
+}
+
+// Mettre à jour l'affichage du calendrier
+function updateCalendarDisplay() {
+    const monthNames = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    
+    // Mettre à jour le titre du mois
+    const monthYearElement = document.getElementById('currentMonthYear');
+    monthYearElement.textContent = `${monthNames[currentCalendarDate.getMonth()]} ${currentCalendarDate.getFullYear()}`;
+    
+    // Générer les jours du calendrier
+    generateCalendarDays();
+}
+
+// Générer les jours du calendrier
+function generateCalendarDays() {
+    const calendarDays = document.getElementById('calendarDays');
+    calendarDays.innerHTML = '';
+    
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    
+    // Premier jour du mois et nombre de jours
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    
+    // Premier jour de la semaine (0 = dimanche, 1 = lundi, etc.)
+    let startDate = firstDay.getDay();
+    
+    // Jours du mois précédent pour compléter la première semaine
+    const prevMonth = new Date(year, month - 1, 0);
+    const daysInPrevMonth = prevMonth.getDate();
+    
+    for (let i = startDate - 1; i >= 0; i--) {
+        const dayElement = createCalendarDay(daysInPrevMonth - i, true, false);
+        calendarDays.appendChild(dayElement);
+    }
+    
+    // Jours du mois actuel
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(year, month, day);
+        const isToday = isSameDate(currentDate, today);
+        const isSelected = selectedFilterDate && isSameDate(currentDate, selectedFilterDate);
+        
+        const dayElement = createCalendarDay(day, false, isToday, isSelected, currentDate);
+        calendarDays.appendChild(dayElement);
+    }
+    
+    // Jours du mois suivant pour compléter la dernière semaine
+    const totalCells = calendarDays.children.length;
+    const remainingCells = 42 - totalCells; // 6 semaines × 7 jours
+    
+    for (let day = 1; day <= remainingCells; day++) {
+        const dayElement = createCalendarDay(day, true, false);
+        calendarDays.appendChild(dayElement);
+    }
+}
+
+// Créer un élément jour du calendrier
+function createCalendarDay(day, isOutside, isToday, isSelected = false, date = null) {
+    const dayElement = document.createElement('div');
+    dayElement.className = 'calendar-day';
+    dayElement.textContent = day;
+    
+    if (isOutside) {
+        dayElement.classList.add('outside');
+    } else {
+        if (isToday) dayElement.classList.add('today');
+        if (isSelected) dayElement.classList.add('selected');
+        
+        // Ajouter l'événement de clic seulement pour les jours du mois actuel
+        if (date) {
+            dayElement.addEventListener('click', () => selectDate(date));
+        }
+    }
+    
+    return dayElement;
+}
+
+// Sélectionner une date
+function selectDate(date) {
+    selectedFilterDate = new Date(date);
+    updateCalendarDisplay();
+    updateSelectedDateInfo();
+}
+
+// Mettre à jour l'information de la date sélectionnée
+function updateSelectedDateInfo() {
+    const currentFilterText = document.getElementById('currentFilterText');
+    
+    if (dateFilterMode === 'all') {
+        currentFilterText.innerHTML = 'Affichage : <strong>Toutes les dates</strong>';
+    } else if (selectedFilterDate) {
+        const dateStr = formatDateForDisplay(selectedFilterDate);
+        currentFilterText.innerHTML = `Affichage : <strong>${dateStr}</strong>`;
+    } else {
+        currentFilterText.innerHTML = 'Affichage : <strong>Sélectionnez une date</strong>';
+    }
+}
+
+// Appliquer le filtre de date
+function applyDateFilter() {
+    if (dateFilterMode === 'all') {
+        selectedFilterDate = null;
+    }
+    
+    // Fermer le modal
+    closeDatePicker();
+    
+    // Recharger les statistiques avec le nouveau filtre
+    loadAndDisplayStats();
+    
+    console.log('[TempoList] Filtre de date appliqué:', selectedFilterDate ? formatDateForDisplay(selectedFilterDate) : 'Toutes les dates');
+}
+
+// Filtrer les votes par date
+function filterVotesByDate(voteHistory, filterDate) {
+    if (!filterDate) {
+        return voteHistory;
+    }
+    
+    return voteHistory.filter(vote => {
+        const voteDate = new Date(vote.timestamp);
+        return isSameDate(voteDate, filterDate);
+    });
+}
+
+// Recalculer les statistiques à partir d'un historique filtré
+function recalculateStatsFromFilteredHistory(filteredHistory) {
+    const stats = {};
+    
+    filteredHistory.forEach(vote => {
+        const { encoderName, isPositive, coefficient } = vote;
+        
+        if (!stats[encoderName]) {
+            stats[encoderName] = {
+                totalVotes: 0,
+                positiveScore: 0,
+                negativeScore: 0,
+                percentage: 0
+            };
+        }
+        
+        stats[encoderName].totalVotes++;
+        if (isPositive) {
+            stats[encoderName].positiveScore += coefficient;
+        } else {
+            stats[encoderName].negativeScore += coefficient;
+        }
+    });
+    
+    // Calculer les pourcentages
+    Object.keys(stats).forEach(encoderName => {
+        const encoderStats = stats[encoderName];
+        const totalScore = encoderStats.positiveScore + encoderStats.negativeScore;
+        encoderStats.percentage = totalScore > 0 ? (encoderStats.positiveScore / totalScore) * 100 : 0;
+    });
+    
+    return stats;
+}
+
+// Vérifier si deux dates sont identiques (même jour)
+function isSameDate(date1, date2) {
+    return date1.getDate() === date2.getDate() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getFullYear() === date2.getFullYear();
+}
+
+// Formater une date pour l'affichage
+function formatDateForDisplay(date) {
+    const options = { 
+        day: '2-digit', 
+        month: 'long', 
+        year: 'numeric',
+        weekday: 'long'
+    };
+    return date.toLocaleDateString('fr-FR', options);
+} 
