@@ -1472,8 +1472,8 @@ function extractDetailFournitureFromText(text) {
             return matchInter[1] + ' inter';
         }
     }
-    // 2. Grammage : 8g, 20g, 21g, 40g, 150g, 160g, 180g, 224g, 250g
-    const regexGrammage = /\b(8|20|21|40|150|160|180|224|250)\s*[gG]\b/;
+    // 2. Grammage : 8g, 20g, 21g, 40g, 125g, 150g, 160g, 180g, 224g, 250g
+    const regexGrammage = /\b(8|20|21|40|125|150|160|180|224|250)\s*[gG]\b/;
     const matchGrammage = text.match(regexGrammage);
     if (matchGrammage) {
         return matchGrammage[1] + 'g';
