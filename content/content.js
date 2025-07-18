@@ -1425,6 +1425,7 @@ const exclureRefsTaille = [
     '3346802',
     '3342802',
     'CLA03-0024',
+    'EXA85103E',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
@@ -2705,3 +2706,258 @@ new MutationObserver(() => {
         setTimeout(initEncoderStats, 100); // Réduit de 1000ms à 100ms grâce à l'optimisation
     }
 }).observe(document, { subtree: true, childList: true });
+
+// ========================================
+// FONCTIONNALITÉ D'AFFICHAGE DES EXTENSIONS DE PIÈCES JOINTES
+// ========================================
+
+// Configuration par défaut pour l'affichage des extensions
+let ATTACHMENT_EXTENSIONS_CONFIG = {
+    enabled: true // Activée par défaut
+};
+
+// Charger la configuration des extensions de PJ
+async function loadAttachmentExtensionsConfig() {
+    try {
+        const result = await chrome.storage.sync.get('attachmentExtensionsConfig');
+        if (result.attachmentExtensionsConfig) {
+            ATTACHMENT_EXTENSIONS_CONFIG = { ...ATTACHMENT_EXTENSIONS_CONFIG, ...result.attachmentExtensionsConfig };
+        }
+    } catch (error) {
+        console.log(`[TempoList] Erreur lors du chargement de la configuration des extensions de PJ: ${error.message}`);
+    }
+}
+
+// Fonction pour extraire l'extension d'un fichier à partir d'une URL
+function getFileExtension(url) {
+    try {
+        // Supprimer les paramètres d'URL et extraire le nom de fichier
+        const urlPart = url.split('?')[0];
+        const fileName = urlPart.split('/').pop();
+        const extension = fileName.split('.').pop().toLowerCase();
+        
+        // Vérifier que ce n'est pas juste le nom du fichier sans extension
+        if (extension && extension !== fileName && extension.length <= 6) {
+            return extension;
+        }
+        return null;
+    } catch (error) {
+        console.log(`[TempoList] Erreur lors de l'extraction de l'extension: ${error.message}`);
+        return null;
+    }
+}
+
+// Fonction pour obtenir une couleur en fonction de l'extension
+function getExtensionColor(extension) {
+    const colorMap = {
+        // Images
+        'png': '#10b981',
+        'jpg': '#10b981', 
+        'jpeg': '#10b981',
+        'gif': '#10b981',
+        'bmp': '#10b981',
+        'webp': '#10b981',
+        'svg': '#10b981',
+        
+        // Documents
+        'pdf': '#dc2626',
+        'doc': '#3b82f6',
+        'docx': '#3b82f6',
+        'xls': '#059669',
+        'xlsx': '#059669',
+        'ppt': '#ea580c',
+        'pptx': '#ea580c',
+        'txt': '#6b7280',
+        'rtf': '#6b7280',
+        
+        // Archives
+        'zip': '#7c3aed',
+        'rar': '#7c3aed',
+        '7z': '#7c3aed',
+        
+        // Audio/Vidéo
+        'mp3': '#f59e0b',
+        'mp4': '#f59e0b',
+        'avi': '#f59e0b',
+        'mov': '#f59e0b',
+        'wav': '#f59e0b',
+        
+        // Par défaut
+        'default': '#6b7280'
+    };
+    
+    return colorMap[extension] || colorMap['default'];
+}
+
+// Fonction pour créer l'étiquette d'extension
+function createExtensionBadge(extension) {
+    const badge = document.createElement('span');
+    badge.className = 'tempolist-extension-badge';
+    badge.textContent = extension.toUpperCase();
+    badge.style.cssText = `
+        display: inline-block;
+        background-color: ${getExtensionColor(extension)};
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin: 0 8px;
+        vertical-align: 7px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        line-height: 1;
+        position: relative;
+        top: -1px;
+    `;
+    
+    return badge;
+}
+
+// Fonction principale pour ajouter les badges d'extension aux pièces jointes
+function addExtensionBadgesToAttachments() {
+    // Vérifier si la fonctionnalité est activée
+    if (!ATTACHMENT_EXTENSIONS_CONFIG.enabled) {
+        return;
+    }
+    
+    // Vérifier qu'on est sur une page crealiste.com avec des pièces jointes
+    if (!window.location.hostname.includes('crealiste.com')) {
+        return;
+    }
+    
+    // Chercher tous les boutons de suppression de pièces jointes
+    const deleteButtons = document.querySelectorAll('.buttonSupImgpjNew');
+    
+    deleteButtons.forEach(deleteButton => {
+        // Vérifier si un badge n'a pas déjà été ajouté
+        if (deleteButton.parentNode.querySelector('.tempolist-extension-badge')) {
+            return;
+        }
+        
+        // Trouver le lien de l'œil (bouton de visualisation) dans la même ligne
+        const row = deleteButton.closest('tr');
+        if (!row) return;
+        
+        const eyeLink = row.querySelector('a[href][title]:not(.buttonSupImgpjNew)');
+        if (!eyeLink) return;
+        
+        const fileUrl = eyeLink.getAttribute('href');
+        if (!fileUrl) return;
+        
+        const extension = getFileExtension(fileUrl);
+        if (!extension) return;
+        
+        // Créer et ajouter le badge avec un espacement équilibré
+        const badge = createExtensionBadge(extension);
+        
+        // S'assurer que le badge est correctement positionné entre l'œil et la corbeille
+        const actionCell = deleteButton.parentNode;
+        const eyeLinkForPosition = actionCell.querySelector('a[href][title]:not(.buttonSupImgpjNew)');
+        
+        if (eyeLinkForPosition && eyeLinkForPosition.nextSibling) {
+            // Insérer le badge après le lien de l'œil
+            eyeLinkForPosition.parentNode.insertBefore(badge, eyeLinkForPosition.nextSibling);
+        } else {
+            // Fallback : insérer avant le bouton de suppression
+            actionCell.insertBefore(badge, deleteButton);
+        }
+        
+        console.log(`[TempoList] Badge d'extension "${extension}" ajouté pour ${fileUrl}`);
+    });
+}
+
+// Observer pour détecter les changements dans le DOM
+let attachmentObserver = null;
+
+// Fonction pour démarrer l'observation des pièces jointes
+function startAttachmentObserver() {
+    if (!ATTACHMENT_EXTENSIONS_CONFIG.enabled) {
+        return;
+    }
+    
+    // Arrêter l'observateur existant s'il y en a un
+    if (attachmentObserver) {
+        attachmentObserver.disconnect();
+    }
+    
+    // Ajouter les badges aux éléments existants
+    addExtensionBadgesToAttachments();
+    
+    // Créer un nouvel observateur pour les nouveaux éléments
+    attachmentObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Vérifier si des boutons de suppression de PJ ont été ajoutés
+                        if (node.querySelector && node.querySelector('.buttonSupImgpjNew')) {
+                            setTimeout(() => addExtensionBadgesToAttachments(), 100);
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
+    // Commencer l'observation
+    attachmentObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    console.log('[TempoList] Observateur des pièces jointes démarré');
+}
+
+// Fonction pour arrêter l'observation des pièces jointes
+function stopAttachmentObserver() {
+    if (attachmentObserver) {
+        attachmentObserver.disconnect();
+        attachmentObserver = null;
+        console.log('[TempoList] Observateur des pièces jointes arrêté');
+    }
+    
+    // Supprimer tous les badges existants
+    document.querySelectorAll('.tempolist-extension-badge').forEach(badge => {
+        badge.remove();
+    });
+}
+
+// Écouter les messages pour activer/désactiver la fonctionnalité
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'updateAttachmentExtensions') {
+        ATTACHMENT_EXTENSIONS_CONFIG = { ...ATTACHMENT_EXTENSIONS_CONFIG, ...request.config };
+        
+        if (ATTACHMENT_EXTENSIONS_CONFIG.enabled) {
+            startAttachmentObserver();
+        } else {
+            stopAttachmentObserver();
+        }
+        
+        sendResponse({ success: true });
+    }
+});
+
+// Initialiser la fonctionnalité au chargement de la page
+async function initializeAttachmentExtensions() {
+    await loadAttachmentExtensionsConfig();
+    
+    // Démarrer seulement si on est sur crealiste.com
+    if (window.location.hostname.includes('crealiste.com')) {
+        if (ATTACHMENT_EXTENSIONS_CONFIG.enabled) {
+            startAttachmentObserver();
+        }
+    }
+}
+
+// Lancer l'initialisation
+if (checkExtensionValidity()) {
+    // Attendre que le DOM soit chargé
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAttachmentExtensions);
+    } else {
+        initializeAttachmentExtensions();
+    }
+}

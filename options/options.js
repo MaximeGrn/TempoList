@@ -21,6 +21,7 @@ let dateFilterMode = 'all'; // 'all' ou 'specific'
 async function initializeOptions() {
     try {
         await loadSettings();
+        await loadAttachmentExtensionsConfig();
         displayTeams();
         updateTargetInput();
     } catch (error) {
@@ -48,6 +49,9 @@ function setupEventListeners() {
     document.getElementById('enableTableStats').addEventListener('change', handleTableStatsChange);
     document.getElementById('viewStatsBtn').addEventListener('click', openStatsModal);
     document.getElementById('closeStatsBtn').addEventListener('click', closeStatsModal);
+    
+    // Extensions de pièces jointes
+    document.getElementById('enableAttachmentExtensions').addEventListener('change', handleAttachmentExtensionsChange);
     
     // Event listeners pour les switches visuels
     document.getElementById('enableEncoderStatsToggle').addEventListener('click', function(e) {
@@ -298,6 +302,50 @@ function handleTableStatsChange() {
     chrome.storage.local.set({ enableTableStats: isEnabled }, () => {
         showNotification(message, notificationType);
     });
+}
+
+// ========================================
+// GESTION DES EXTENSIONS DE PIÈCES JOINTES
+// ========================================
+
+// Gestion de l'affichage des extensions de pièces jointes
+function handleAttachmentExtensionsChange() {
+    const isEnabled = document.getElementById('enableAttachmentExtensions').checked;
+    const message = isEnabled ? 'Affichage des extensions de PJ activé !' : 'Affichage des extensions de PJ désactivé !';
+    const notificationType = isEnabled ? 'success' : 'info';
+    
+    // Sauvegarder immédiatement
+    const config = { enabled: isEnabled };
+    chrome.storage.sync.set({ attachmentExtensionsConfig: config }, () => {
+        showNotification(message, notificationType);
+        
+        // Envoyer un message aux content scripts pour mettre à jour la fonctionnalité
+        chrome.tabs.query({ url: "*://crealiste.com/*" }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateAttachmentExtensions',
+                    config: config
+                }).catch(() => {
+                    // Ignorer les erreurs si l'onglet n'est pas prêt
+                });
+            });
+        });
+    });
+}
+
+// Charger la configuration des extensions de PJ
+async function loadAttachmentExtensionsConfig() {
+    try {
+        const result = await chrome.storage.sync.get('attachmentExtensionsConfig');
+        const config = result.attachmentExtensionsConfig || { enabled: true };
+        
+        const checkbox = document.getElementById('enableAttachmentExtensions');
+        if (checkbox) {
+            checkbox.checked = config.enabled;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration des extensions de PJ:', error);
+    }
 }
 
 // Charger les paramètres depuis le stockage
