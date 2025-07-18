@@ -53,24 +53,7 @@ function setupEventListeners() {
     // Extensions de pièces jointes
     document.getElementById('enableAttachmentExtensions').addEventListener('change', handleAttachmentExtensionsChange);
     
-    // Event listeners pour les switches visuels
-    document.getElementById('enableEncoderStatsToggle').addEventListener('click', function(e) {
-        e.preventDefault();
-        if (!this.classList.contains('disabled')) {
-            const checkbox = document.getElementById('enableEncoderStats');
-            checkbox.checked = !checkbox.checked;
-            checkbox.dispatchEvent(new Event('change'));
-        }
-    });
-    
-    document.getElementById('enableTableStatsToggle').addEventListener('click', function(e) {
-        e.preventDefault();
-        if (!this.classList.contains('disabled')) {
-            const checkbox = document.getElementById('enableTableStats');
-            checkbox.checked = !checkbox.checked;
-            checkbox.dispatchEvent(new Event('change'));
-        }
-    });
+
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
     document.getElementById('dateFilterBtn').addEventListener('click', openDatePicker);
     document.getElementById('resetStatsBtn').addEventListener('click', resetAllStats);
@@ -200,7 +183,7 @@ function handleAssistModeChange() {
             chrome.storage.local.set({ enableTableStats: false });
         }
         // Cacher l'option du tableau des stats
-        document.getElementById('tableStatsOption').style.display = 'none';
+        document.getElementById('tableStatsOption').classList.add('hidden');
     }
     
     // Sauvegarder immédiatement
@@ -236,31 +219,24 @@ function handleSpeedModeChange() {
     currentAutomationConfig = { ...SPEED_PRESETS[speed] };
 }
 
-// Fonctions utilitaires pour les switches
+// Fonctions utilitaires pour les checkboxes iOS (remplace les switches)
 function updateSwitchAppearance(switchId, isChecked) {
-    const switchToggle = document.getElementById(switchId + 'Toggle');
-    if (switchToggle) {
-        if (isChecked) {
-            switchToggle.classList.add('checked');
-        } else {
-            switchToggle.classList.remove('checked');
-        }
+    const switchInput = document.getElementById(switchId);
+    if (switchInput) {
+        switchInput.checked = isChecked;
     }
 }
 
 function setSwitchEnabled(switchId, isEnabled) {
     const switchElement = document.getElementById(switchId + 'Switch');
-    const switchToggle = document.getElementById(switchId + 'Toggle');
     const switchInput = document.getElementById(switchId);
     
     if (isEnabled) {
-        switchElement.classList.remove('disabled');
-        switchToggle.classList.remove('disabled');
-        switchInput.disabled = false;
+        if (switchElement) switchElement.classList.remove('disabled');
+        if (switchInput) switchInput.disabled = false;
     } else {
-        switchElement.classList.add('disabled');
-        switchToggle.classList.add('disabled');
-        switchInput.disabled = true;
+        if (switchElement) switchElement.classList.add('disabled');
+        if (switchInput) switchInput.disabled = true;
     }
 }
 
@@ -275,9 +251,9 @@ function handleEncoderStatsChange() {
     
     // Afficher/cacher l'option des stats dans le tableau selon l'activation des stats générales
     if (isEnabled) {
-        tableStatsOption.style.display = 'block';
+        tableStatsOption.classList.remove('hidden');
     } else {
-        tableStatsOption.style.display = 'none';
+        tableStatsOption.classList.add('hidden');
         // Désactiver aussi les stats du tableau si les stats générales sont désactivées
         document.getElementById('enableTableStats').checked = false;
         updateSwitchAppearance('enableTableStats', false);
@@ -382,9 +358,9 @@ async function loadSettings() {
     // Afficher/cacher l'option tableau selon l'activation des stats générales
     const tableStatsOption = document.getElementById('tableStatsOption');
     if (isEncoderStatsEnabled && isAssistEnabled) {
-        tableStatsOption.style.display = 'block';
+        tableStatsOption.classList.remove('hidden');
     } else {
-        tableStatsOption.style.display = 'none';
+        tableStatsOption.classList.add('hidden');
     }
     
     // Mettre à jour le slider animé

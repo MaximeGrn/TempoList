@@ -130,29 +130,53 @@
                     </svg>
                     Statistiques Encodeurs
                 </h2>
-                <div class="stats-switches-container">
-                    <div class="input-group">
-                        <label class="modern-switch" id="enableEncoderStatsSwitch">
-                            <div class="switch-toggle" id="enableEncoderStatsToggle">
-                                <div class="switch-thumb"></div>
-                                <input type="checkbox" id="enableEncoderStats" class="switch-input">
-                            </div>
-                            <span>Activer les statistiques des encodeurs</span>
-                        </label>
-                        <div class="help-text">
-                            Permet de noter la qualité du travail des encodeurs et d'afficher un score de confiance sur les pages de correction.
+                <div class="feature-control">
+                    <div class="feature-option">
+                        <div class="feature-checkbox-container">
+                            <label class="ios-checkbox dark" id="enableEncoderStatsSwitch">
+                                <input type="checkbox" id="enableEncoderStats">
+                                <div class="checkbox-wrapper">
+                                    <div class="checkbox-bg"></div>
+                                    <svg fill="none" viewBox="0 0 24 24" class="checkbox-icon">
+                                        <path
+                                            stroke-linejoin="round"
+                                            stroke-linecap="round"
+                                            stroke-width="3"
+                                            stroke="currentColor"
+                                            d="M4 12L10 18L20 6"
+                                            class="check-path"
+                                        ></path>
+                                    </svg>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Activer les statistiques des encodeurs</h3>
+                            <p>Permet de noter la qualité du travail des encodeurs et d'afficher un score de confiance sur les pages de correction.</p>
                         </div>
                     </div>
-                    <div class="input-group" id="tableStatsOption" style="display: none;">
-                        <label class="modern-switch" id="enableTableStatsSwitch">
-                            <div class="switch-toggle" id="enableTableStatsToggle">
-                                <div class="switch-thumb"></div>
-                                <input type="checkbox" id="enableTableStats" class="switch-input">
-                            </div>
-                            <span>Afficher dans les listes à valider</span>
-                        </label>
-                        <div class="help-text">
-                            Affiche le score de confiance de chaque encodeur directement dans le tableau des listes à valider pour une vue d'ensemble rapide.
+                    <div class="feature-option hidden" id="tableStatsOption">
+                        <div class="feature-checkbox-container">
+                            <label class="ios-checkbox dark" id="enableTableStatsSwitch">
+                                <input type="checkbox" id="enableTableStats">
+                                <div class="checkbox-wrapper">
+                                    <div class="checkbox-bg"></div>
+                                    <svg fill="none" viewBox="0 0 24 24" class="checkbox-icon">
+                                        <path
+                                            stroke-linejoin="round"
+                                            stroke-linecap="round"
+                                            stroke-width="3"
+                                            stroke="currentColor"
+                                            d="M4 12L10 18L20 6"
+                                            class="check-path"
+                                        ></path>
+                                    </svg>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Afficher dans les listes à valider</h3>
+                            <p>Affiche le score de confiance de chaque encodeur directement dans le tableau des listes à valider pour une vue d'ensemble rapide.</p>
                         </div>
                     </div>
                 </div>
