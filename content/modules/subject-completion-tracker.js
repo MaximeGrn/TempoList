@@ -1,6 +1,21 @@
 // === CALCUL DU TAUX DE REMPLISSAGE DES MATIÈRES ===
 // Module pour calculer et surveiller le taux de remplissage des matières dans les listes de fournitures
 
+// Configuration par défaut
+let SUBJECT_COMPLETION_CONFIG = {
+    enabled: true
+};
+
+// Charger la configuration
+async function loadSubjectCompletionConfig() {
+    try {
+        const result = await chrome.storage.local.get(['subjectCompletionEnabled']);
+        SUBJECT_COMPLETION_CONFIG.enabled = result.subjectCompletionEnabled !== false; // true par défaut
+    } catch (error) {
+        // En cas d'erreur, utiliser la configuration par défaut
+    }
+}
+
 // Fonction pour vérifier si nous sommes sur une page d'édition de liste de fournitures
 function isListEditPage() {
     const url = window.location.href;
@@ -22,42 +37,62 @@ function extractListLevel() {
         }
         return null;
     } catch (error) {
-        console.error('[TempoList] Erreur lors de l\'extraction du niveau:', error);
         return null;
+    }
+}
+
+// Fonction pour vérifier si c'est une liste d'option
+function isOptionList() {
+    try {
+        const codeRefElements = document.querySelectorAll('.lineCodeRef');
+        for (const element of codeRefElements) {
+            const text = element.textContent.trim();
+            if (text.includes('Code référence :')) {
+                // Extraire le code référence
+                const codeRef = text.replace('Code référence :', '').trim();
+                // Vérifier si le code contient "-O-"
+                return codeRef.includes('-O-');
+            }
+        }
+        return false;
+    } catch (error) {
+        return false;
     }
 }
 
 // Fonction pour calculer le taux de remplissage des matières
 function calculateSubjectCompletionRate() {
-    console.log('[TempoList] 🎯 Calcul du taux de remplissage des matières');
+    // Vérifier que la fonctionnalité est activée
+    if (!SUBJECT_COMPLETION_CONFIG.enabled) {
+        return null;
+    }
     
     // Vérifier que nous sommes sur la bonne page
     if (!isListEditPage()) {
-        console.log('[TempoList] ❌ Non exécuté : pas sur une page d\'édition de liste');
-        return;
+        return null;
     }
     
     // Extraire le niveau de la liste
     const level = extractListLevel();
     if (!level) {
-        console.log('[TempoList] ❌ Impossible de déterminer le niveau de la liste');
-        return;
+        return null;
     }
     
-    console.log(`[TempoList] 📋 Niveau détecté: ${level}`);
-    
-    // Vérifier que le niveau n'est pas "primaire"
+    // Exclure les listes primaires
     if (level.includes('primaire')) {
-        console.log('[TempoList] ⚠️ Non exécuté : niveau primaire exclu du calcul');
-        return;
+        return null;
+    }
+    
+    // Exclure les listes d'options
+    if (isOptionList()) {
+        return null;
     }
     
     // Trouver tous les selects de matières
     const subjectSelects = document.querySelectorAll('.selectSubject');
     
     if (subjectSelects.length === 0) {
-        console.log('[TempoList] ❌ Aucun select de matière trouvé');
-        return;
+        return null;
     }
     
     const totalLines = subjectSelects.length;
@@ -74,14 +109,6 @@ function calculateSubjectCompletionRate() {
     const filledSubjects = totalLines - emptySubjects;
     const completionRate = totalLines > 0 ? (filledSubjects / totalLines * 100) : 0;
     
-    // Afficher le résultat dans la console
-    console.log('[TempoList] 📊 === STATISTIQUES MATIÈRES ===');
-    console.log(`[TempoList] 📝 Total lignes: ${totalLines}`);
-    console.log(`[TempoList] ✅ Matières remplies: ${filledSubjects}`);
-    console.log(`[TempoList] ❌ Matières vides: ${emptySubjects}`);
-    console.log(`[TempoList] 🎯 Taux de completion: ${completionRate.toFixed(1)}%`);
-    console.log('[TempoList] ================================');
-    
     return {
         totalLines,
         filledSubjects,
@@ -90,9 +117,81 @@ function calculateSubjectCompletionRate() {
     };
 }
 
+// Fonction pour créer l'étiquette de pourcentage
+function createCompletionBadge(completionRate) {
+    // Supprimer l'étiquette existante si elle existe
+    const existingBadge = document.querySelector('.tempolist-completion-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+    
+    // Créer la nouvelle étiquette
+    const badge = document.createElement('span');
+    badge.className = 'tempolist-completion-badge';
+    badge.textContent = `Matières : ${completionRate.toFixed(1)}%`;
+    
+    // Style de l'étiquette amélioré
+    const isHighCompletion = completionRate > 70;
+    badge.style.cssText = `
+        display: inline-block;
+        background-color: ${isHighCompletion ? '#28a745' : '#dc3545'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        margin-left: 20px;
+        border: none;
+        vertical-align: middle;
+        font-family: Arial, sans-serif;
+    `;
+    
+    return badge;
+}
+
+// Fonction pour mettre à jour l'étiquette de completion
+function updateCompletionBadge() {
+    // Calculer le taux de completion
+    const result = calculateSubjectCompletionRate();
+    
+    // Trouver l'élément h2 contenant "Produits de la liste"
+    const h2Elements = document.querySelectorAll('h2');
+    
+    let h2Element = null;
+    h2Elements.forEach((h2) => {
+        if (h2.textContent.includes('Produits de la liste')) {
+            h2Element = h2;
+        }
+    });
+    
+    if (!h2Element) {
+        return;
+    }
+    
+    if (result === null) {
+        // Supprimer l'étiquette si elle existe (cas primaire, option, désactivé, ou erreur)
+        const existingBadge = document.querySelector('.tempolist-completion-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+        return;
+    }
+    
+    // Créer et ajouter l'étiquette
+    const badge = createCompletionBadge(result.completionRate);
+    
+    // Vérifier si une étiquette existe déjà
+    const existingBadge = document.querySelector('.tempolist-completion-badge');
+    if (existingBadge) {
+        existingBadge.replaceWith(badge);
+    } else {
+        h2Element.appendChild(badge);
+    }
+}
+
 // Fonction pour surveiller les changements et recalculer automatiquement
 function startSubjectCompletionMonitoring() {
-    if (!isListEditPage()) {
+    if (!SUBJECT_COMPLETION_CONFIG.enabled || !isListEditPage()) {
         return;
     }
     
@@ -101,10 +200,12 @@ function startSubjectCompletionMonitoring() {
         return;
     }
     
-    console.log('[TempoList] 🎯 Surveillance du taux de remplissage des matières activée');
+    if (isOptionList()) {
+        return;
+    }
     
-    // Calcul initial
-    calculateSubjectCompletionRate();
+    // Mise à jour initiale
+    updateCompletionBadge();
     
     // Observer les changements sur les selects de matières
     const observer = new MutationObserver((mutations) => {
@@ -126,7 +227,7 @@ function startSubjectCompletionMonitoring() {
         
         if (shouldRecalculate) {
             // Attendre un peu pour que les modifications soient terminées
-            setTimeout(calculateSubjectCompletionRate, 500);
+            setTimeout(updateCompletionBadge, 500);
         }
     });
     
@@ -140,13 +241,35 @@ function startSubjectCompletionMonitoring() {
     // Observer aussi les changements de valeur sur les selects existants
     document.addEventListener('change', (event) => {
         if (event.target.classList.contains('selectSubject')) {
-            setTimeout(calculateSubjectCompletionRate, 100);
+            setTimeout(updateCompletionBadge, 100);
         }
     });
 }
 
+// Écouter les messages pour activer/désactiver la fonctionnalité
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'updateSubjectCompletion') {
+        SUBJECT_COMPLETION_CONFIG = { ...SUBJECT_COMPLETION_CONFIG, ...request.config };
+        
+        if (SUBJECT_COMPLETION_CONFIG.enabled) {
+            // Redémarrer la surveillance
+            setTimeout(startSubjectCompletionMonitoring, 100);
+        } else {
+            // Supprimer l'étiquette si elle existe
+            const existingBadge = document.querySelector('.tempolist-completion-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+        }
+        
+        sendResponse({ success: true });
+    }
+});
+
 // Initialiser la surveillance du taux de remplissage des matières
-function initSubjectCompletionTracking() {
+async function initSubjectCompletionTracking() {
+    await loadSubjectCompletionConfig();
+    
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(startSubjectCompletionMonitoring, 1000);
@@ -156,12 +279,11 @@ function initSubjectCompletionTracking() {
     }
 }
 
-// Fonction de vérification de validité de l'extension (importée du script principal)
+// Fonction de vérification de validité de l'extension
 function checkExtensionValidity() {
     try {
         return chrome && chrome.runtime && chrome.runtime.id;
     } catch (error) {
-        console.log('[TempoList] Extension context invalidated, script will not run');
         return false;
     }
 }
@@ -169,7 +291,4 @@ function checkExtensionValidity() {
 // Démarrer le suivi du taux de remplissage si l'extension est valide
 if (checkExtensionValidity()) {
     initSubjectCompletionTracking();
-}
-
-// Exposer la fonction pour les tests manuels
-window.tempoListCalculateSubjects = calculateSubjectCompletionRate; 
+} 

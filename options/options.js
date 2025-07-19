@@ -22,6 +22,7 @@ async function initializeOptions() {
     try {
         await loadSettings();
         await loadAttachmentExtensionsConfig();
+        await loadSubjectCompletionConfig();
         displayTeams();
         updateTargetInput();
     } catch (error) {
@@ -52,6 +53,7 @@ function setupEventListeners() {
     
     // Extensions de pièces jointes
     document.getElementById('enableAttachmentExtensions').addEventListener('change', handleAttachmentExtensionsChange);
+document.getElementById('enableSubjectCompletion').addEventListener('change', handleSubjectCompletionChange);
     
 
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
@@ -169,6 +171,7 @@ function handleAssistModeChange() {
     const isAssistEnabled = mode !== 'none';
     setSwitchEnabled('enableEncoderStats', isAssistEnabled);
     setSwitchEnabled('enableTableStats', isAssistEnabled);
+    setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
     
     // Si le mode d'assistance est désactivé, désactiver aussi les switches
     if (!isAssistEnabled) {
@@ -181,6 +184,11 @@ function handleAssistModeChange() {
             document.getElementById('enableTableStats').checked = false;
             updateSwitchAppearance('enableTableStats', false);
             chrome.storage.local.set({ enableTableStats: false });
+        }
+        if (document.getElementById('enableSubjectCompletion').checked) {
+            document.getElementById('enableSubjectCompletion').checked = false;
+            updateSwitchAppearance('enableSubjectCompletion', false);
+            chrome.storage.local.set({ subjectCompletionEnabled: false });
         }
         // Cacher l'option du tableau des stats
         document.getElementById('tableStatsOption').classList.add('hidden');
@@ -324,6 +332,49 @@ async function loadAttachmentExtensionsConfig() {
     }
 }
 
+// ========================================
+// GESTION DE LA COMPLÉTION DES MATIÈRES
+// ========================================
+
+// Gestion de l'affichage du pourcentage de complétion des matières
+function handleSubjectCompletionChange() {
+    const isEnabled = document.getElementById('enableSubjectCompletion').checked;
+    const message = isEnabled ? 'Affichage % de complétion des matières activé !' : 'Affichage % de complétion des matières désactivé !';
+    const notificationType = isEnabled ? 'success' : 'info';
+    
+    // Sauvegarder immédiatement
+    chrome.storage.local.set({ subjectCompletionEnabled: isEnabled }, () => {
+        showNotification(message, notificationType);
+        
+        // Envoyer un message aux content scripts pour mettre à jour la fonctionnalité
+        chrome.tabs.query({ url: "*://crealiste.com/*" }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateSubjectCompletion',
+                    config: { enabled: isEnabled }
+                }).catch(() => {
+                    // Ignorer les erreurs si l'onglet n'est pas prêt
+                });
+            });
+        });
+    });
+}
+
+// Charger la configuration de la complétion des matières
+async function loadSubjectCompletionConfig() {
+    try {
+        const result = await chrome.storage.local.get('subjectCompletionEnabled');
+        const isEnabled = result.subjectCompletionEnabled !== false; // true par défaut
+        
+        const checkbox = document.getElementById('enableSubjectCompletion');
+        if (checkbox) {
+            checkbox.checked = isEnabled;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration de la complétion des matières:', error);
+    }
+}
+
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
     const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats', 'enableTableStats']);
@@ -354,6 +405,7 @@ async function loadSettings() {
     const isAssistEnabled = mode !== 'none';
     setSwitchEnabled('enableEncoderStats', isAssistEnabled);
     setSwitchEnabled('enableTableStats', isAssistEnabled);
+    setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
     
     // Afficher/cacher l'option tableau selon l'activation des stats générales
     const tableStatsOption = document.getElementById('tableStatsOption');
