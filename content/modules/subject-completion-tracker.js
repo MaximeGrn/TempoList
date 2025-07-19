@@ -139,7 +139,7 @@ function createCompletionBadge(completionRate) {
         padding: 12px 20px;
         border-radius: 8px;
         font-size: 16px;
-        font-weight: bold;
+
         margin-left: 20px;
         border: none;
         vertical-align: middle;

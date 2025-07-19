@@ -1167,11 +1167,11 @@ const imageRotations = new Map();
 function rotateImage(srcUrl) {
     // Vérifier qu'on est bien sur rentreediscount.com ou scoleo.fr
     if (!window.location.hostname.includes('rentreediscount.com') && !window.location.hostname.includes('scoleo.fr')) {
-        console.log('[TempoList] Rotation d\'image uniquement disponible sur rentreediscount.com ou scoleo.fr');
+
         return;
     }
     
-    console.log('[TempoList] Rotation de l\'image:', srcUrl);
+
     
     // Trouver l'image sur la page
     const images = document.querySelectorAll('img');
@@ -1273,7 +1273,7 @@ window.addEventListener('beforeunload', () => {
     imageRotations.clear();
 });
 
-console.log('[TempoList] Fonctionnalité de rotation d\'image chargée pour rentreediscount.com'); 
+ 
 
 // === COLONNE ASSIST DYNAMIQUE ===
 // Fonction utilitaire pour extraire la couleur depuis un texte
@@ -2866,7 +2866,7 @@ function addExtensionBadgesToAttachments() {
             actionCell.insertBefore(badge, deleteButton);
         }
         
-        console.log(`[TempoList] Badge d'extension "${extension}" ajouté pour ${fileUrl}`);
+
     });
 }
 
@@ -2909,7 +2909,7 @@ function startAttachmentObserver() {
         subtree: true
     });
     
-    console.log('[TempoList] Observateur des pièces jointes démarré');
+
 }
 
 // Fonction pour arrêter l'observation des pièces jointes
@@ -2917,7 +2917,7 @@ function stopAttachmentObserver() {
     if (attachmentObserver) {
         attachmentObserver.disconnect();
         attachmentObserver = null;
-        console.log('[TempoList] Observateur des pièces jointes arrêté');
+    
     }
     
     // Supprimer tous les badges existants
