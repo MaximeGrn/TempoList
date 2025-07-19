@@ -1427,6 +1427,7 @@ const exclureRefsTaille = [
     'CLA03-0024',
     'EXA85103E',
     'EXA85109E',
+    'CLA05-0006',
     // Ajoute ici d'autres références à exclure pour la taille
 ];
 // Références à exclure pour Simple/Double
