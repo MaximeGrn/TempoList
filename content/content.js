@@ -2962,3 +2962,4 @@ if (checkExtensionValidity()) {
         initializeAttachmentExtensions();
     }
 }
+
