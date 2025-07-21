@@ -4,8 +4,8 @@
 // Configuration par défaut
 let VALIDATION_AUTO_CONFIG = {
     enabled: true,
-    delayBetweenActions: 1500, // Délai entre chaque action (ms)
-    validationDelay: 3000, // Délai après validation d'une option (3s)
+    delayBetweenActions: 1000, // Délai entre chaque action (ms)
+    validationDelay: 2000, // Délai après validation d'une option (2s)
     maxRetries: 3
 };
 
@@ -199,7 +199,8 @@ function createValidationAutoButton() {
         width: 100%;
         display: flex;
         justify-content: center;
-        margin-top: 15px;
+        margin-top: 25px;
+        padding-top: 10px;
     `;
     
     // Créer le nouveau bouton avec le nouveau design
@@ -212,10 +213,10 @@ function createValidationAutoButton() {
         justify-content: center;
         align-items: center;
         height: 80px;
-        padding: 10px 20px;
+        padding: 10px 30px;
         text-decoration: none;
         cursor: pointer;
-        min-width: 200px;
+        min-width: 280px;
     `;
     
     // Utiliser le SVG Bootstrap Icons cart-check
@@ -443,7 +444,7 @@ async function validateCurrentOption() {
             const listeMereUrl = state[STORAGE_KEYS.LISTE_MERE_URL];
             console.log('[ValidationAuto] 🔄 Retour à la liste mère:', listeMereUrl);
             window.location.href = listeMereUrl;
-        }, 2000); // 2 secondes au lieu de 3
+        }, 1500); // 2 secondes au lieu de 3
         
         return true;
     } else {
@@ -716,13 +717,21 @@ function removeProgressPanel() {
     }
 }
 
-// Fonction pour gérer la touche Échap
-function handleEscapeKey(event) {
-    if (event.key === 'Escape' && isValidationRunning) {
-        console.log('[ValidationAuto] 🛑 Arrêt de la validation automatique demandé par l\'utilisateur');
-        stopValidationAutomatique();
-        event.preventDefault();
-        event.stopPropagation();
+// Fonction pour gérer la touche Échap (spécifique à la validation automatique)
+async function handleValidationEscapeKey(event) {
+    if (event.key === 'Escape' || event.keyCode === 27) { // Support macOS et Windows
+        try {
+            const state = await getValidationState();
+            // Vérifier si une validation est en cours
+            if (isValidationRunning || (state && state[STORAGE_KEYS.VALIDATION_RUNNING])) {
+                console.log('[ValidationAuto] 🛑 Arrêt de la validation automatique demandé par l\'utilisateur (Échap)');
+                await stopValidationAutomatique();
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        } catch (error) {
+            console.error('[ValidationAuto] Erreur lors de la gestion de la touche Échap:', error);
+        }
     }
 }
 
@@ -1003,8 +1012,8 @@ new MutationObserver(() => {
     }
 }).observe(document, { subtree: true, childList: true });
 
-// Ajouter l'écoute de la touche Échap
-document.addEventListener('keydown', handleEscapeKey);
+// Ajouter l'écoute de la touche Échap pour la validation automatique
+document.addEventListener('keydown', handleValidationEscapeKey);
 
 // Initialiser le module quand le DOM est prêt
 if (document.readyState === 'loading') {
