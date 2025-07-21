@@ -12,6 +12,7 @@ let VALIDATION_AUTO_CONFIG = {
 // Variable pour suivre l'état de l'automatisation
 let isValidationRunning = false;
 let currentValidationProcess = null;
+let progressPanel = null;
 
 // Clés de stockage pour maintenir l'état entre les pages
 const STORAGE_KEYS = {
@@ -20,7 +21,8 @@ const STORAGE_KEYS = {
     OPTIONS_LIST: 'validationOptionsList',
     CURRENT_OPTION_INDEX: 'validationCurrentOptionIndex',
     LISTE_MERE_URL: 'validationListeMereUrl',
-    OPTION_BEING_VALIDATED: 'validationOptionBeingValidated' // ID de l'option en cours de validation
+    OPTION_BEING_VALIDATED: 'validationOptionBeingValidated', // ID de l'option en cours de validation
+    VALIDATED_OPTIONS: 'validationValidatedOptions' // Liste des options déjà validées
 };
 
 // Charger la configuration
@@ -63,6 +65,14 @@ async function clearValidationState() {
     }
 }
 
+// Fonction pour vérifier s'il y a des options rattachées à la liste mère
+function hasAttachedOptions() {
+    const optionsContainer = document.querySelector('.listeAGarder');
+    const optionItems = document.querySelectorAll('li[id^="option-"]');
+    
+    return optionsContainer && optionItems.length > 0;
+}
+
 // Fonction pour vérifier si nous sommes sur une page de liste mère
 function isListeMerePage() {
     const url = window.location.href;
@@ -80,7 +90,6 @@ function isListeMerePage() {
     const listeOptionsContainer = document.querySelector('.listeOption');
     
     // Si on trouve le conteneur, c'est probablement une liste mère
-    // (même s'il n'y a pas encore d'options, on peut en ajouter)
     return !!listeOptionsContainer;
 }
 
@@ -146,6 +155,12 @@ function getOptionsToValidate() {
 function createValidationAutoButton() {
     console.log('[ValidationAuto] Création du bouton de validation automatique...');
     
+    // Vérifier s'il y a des options rattachées à la liste mère
+    if (!hasAttachedOptions()) {
+        console.log('[ValidationAuto] Aucune option rattachée trouvée, pas d\'ajout de bouton');
+        return;
+    }
+    
     // Chercher le conteneur des boutons
     const btnContainer = document.querySelector('.divBtnListTeacher.divBtnListTeacher2');
     console.log('[ValidationAuto] Conteneur de boutons trouvé:', !!btnContainer);
@@ -178,19 +193,49 @@ function createValidationAutoButton() {
         return;
     }
     
-    // Créer le nouveau bouton
+    // Créer un conteneur pour le bouton en dessous
+    const bottomContainer = document.createElement('div');
+    bottomContainer.style.cssText = `
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 15px;
+    `;
+    
+    // Créer le nouveau bouton avec le nouveau design
     const newButton = document.createElement('a');
     newButton.id = 'btnValidationAuto';
-    newButton.className = 'col-md-3 text-left listBtnResponsive3 btnTeacher deleteListSimilaire';
-    newButton.style.marginRight = '10px';
-    newButton.innerHTML = '<i class="fas fa-magic" style="margin-left: 14%;"></i>Valider Automatiquement';
+    newButton.className = 'text-center listBtnResponsive3 btnTeacher deleteListSimilaire';
+    newButton.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 80px;
+        padding: 10px 20px;
+        text-decoration: none;
+        cursor: pointer;
+        min-width: 200px;
+    `;
+    
+    // Utiliser le SVG Bootstrap Icons cart-check
+    newButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-cart-check" viewBox="0 0 16 16" style="margin-bottom: 5px;">
+            <path d="M11.354 6.354a.5.5 0 0 0-.708-.708L8 8.293 6.854 7.146a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/>
+            <path d="M.5 1a.5.5 0 0 0 0 1h1.11l.401 1.607 1.498 7.985A.5.5 0 0 0 4 12h1a2 2 0 1 0 0 4 2 2 0 0 0 0-4h7a2 2 0 1 0 0 4 2 2 0 0 0 0-4h1a.5.5 0 0 0 .491-.408l1.5-8A.5.5 0 0 0 14.5 3H2.89l-.405-1.621A.5.5 0 0 0 2 1zm3.915 10L3.102 4h10.796l-1.313 7zM6 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0m7 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+        </svg>
+        <span style="font-size: 14px; line-height: 1.2;">Valider Automatiquement</span>
+    `;
     
     // Ajouter l'événement click
     newButton.addEventListener('click', handleValidationAutoClick);
     
-    // Insérer le bouton avant le bouton "Valider la liste"
-    container.insertBefore(newButton, btnValidation);
-    console.log('[ValidationAuto] Bouton de validation automatique ajouté avec succès !');
+    // Ajouter le bouton au conteneur inférieur
+    bottomContainer.appendChild(newButton);
+    
+    // Insérer le conteneur après le conteneur principal
+    container.parentNode.insertBefore(bottomContainer, container.nextSibling);
+    console.log('[ValidationAuto] Bouton de validation automatique ajouté avec succès en dessous !');
 }
 
 // Fonction pour gérer le clic sur le bouton de validation automatique
@@ -236,6 +281,9 @@ async function startValidationAutomatique() {
             return;
         }
         
+        // Créer le panneau de progression
+        createProgressPanel(optionsToValidate);
+        
         // Sauvegarder l'état de l'automatisation
         await saveValidationState({
             [STORAGE_KEYS.VALIDATION_RUNNING]: true,
@@ -243,7 +291,8 @@ async function startValidationAutomatique() {
             [STORAGE_KEYS.OPTIONS_LIST]: optionsToValidate,
             [STORAGE_KEYS.CURRENT_OPTION_INDEX]: 0,
             [STORAGE_KEYS.LISTE_MERE_URL]: window.location.href,
-            [STORAGE_KEYS.OPTION_BEING_VALIDATED]: null // Reset au démarrage
+            [STORAGE_KEYS.OPTION_BEING_VALIDATED]: null, // Reset au démarrage
+            [STORAGE_KEYS.VALIDATED_OPTIONS]: [] // Reset de la liste des options validées
         });
         
         // Démarrer la validation de la première option
@@ -253,6 +302,7 @@ async function startValidationAutomatique() {
         console.error('[ValidationAuto] Erreur lors de la validation automatique:', error);
         showNotification('Erreur lors de la validation automatique: ' + error.message, 'error');
         await clearValidationState();
+        removeProgressPanel();
     }
 }
 
@@ -283,6 +333,18 @@ async function proceedToNextOption() {
     const nextOption = currentOptionsToValidate[0];
     console.log('[ValidationAuto] 🎯 Prochaine option à valider:', nextOption.name);
     showNotification(`Validation de l'option: ${nextOption.name}`, 'info');
+    
+    // S'assurer que le panneau existe et mettre à jour
+    if (!progressPanel) {
+        const state = await getValidationState();
+        const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+        if (optionsList.length > 0) {
+            await createProgressPanel(optionsList);
+        }
+    }
+    
+    // Mettre à jour le panneau de progression
+    updateProgressPanel(nextOption.id, 'validating');
     
     // Sauvegarder l'option en cours de validation
     await saveValidationState({
@@ -363,6 +425,19 @@ async function validateCurrentOption() {
         console.log('[ValidationAuto] ⏱️ Attente de 2 secondes après validation...');
         showNotification('Option validée, retour à la liste mère dans 2 secondes...', 'info');
         
+        // Mettre à jour le panneau de progression
+        updateProgressPanel(currentOptionId, 'completed');
+        
+        // Ajouter cette option à la liste des options validées
+        const validatedOptions = state[STORAGE_KEYS.VALIDATED_OPTIONS] || [];
+        if (!validatedOptions.includes(currentOptionId)) {
+            validatedOptions.push(currentOptionId);
+            await saveValidationState({
+                [STORAGE_KEYS.VALIDATED_OPTIONS]: validatedOptions,
+                [STORAGE_KEYS.OPTION_BEING_VALIDATED]: null // Reset après validation
+            });
+        }
+        
         // Attendre 2 secondes puis retourner à la liste mère
         setTimeout(async () => {
             const listeMereUrl = state[STORAGE_KEYS.LISTE_MERE_URL];
@@ -371,6 +446,9 @@ async function validateCurrentOption() {
         }, 2000); // 2 secondes au lieu de 3
         
         return true;
+    } else {
+        // Mettre à jour le panneau de progression avec erreur
+        updateProgressPanel(currentOptionId, 'error');
     }
     
     return false;
@@ -381,6 +459,10 @@ async function validateCurrentOption() {
 // Fonction pour valider la liste mère
 async function validateListeMere() {
     console.log('[ValidationAuto] 🎯 Validation de la liste mère...');
+    
+    // Mettre à jour le statut de la liste principale
+    updateMainListProgress('validating');
+    
     const btnValidation = document.querySelector('#btnValidationListe');
     console.log('[ValidationAuto] Bouton de validation de la liste mère trouvé:', !!btnValidation);
     
@@ -389,13 +471,16 @@ async function validateListeMere() {
         const clickSuccess = simulateRobustClick(btnValidation);
         
         if (clickSuccess) {
+            updateMainListProgress('completed');
             showNotification('🎉 Validation automatique terminée avec succès !', 'success');
             console.log('[ValidationAuto] ✅ Validation automatique terminée !');
         } else {
+            updateMainListProgress('error');
             showNotification('Erreur lors du clic sur le bouton de validation', 'error');
             console.error('[ValidationAuto] ❌ Échec du clic sur le bouton de validation');
         }
     } else {
+        updateMainListProgress('error');
         console.error('[ValidationAuto] ❌ Bouton de validation de la liste mère non trouvé');
         showNotification('Erreur: Bouton de validation de la liste mère non trouvé', 'error');
     }
@@ -403,6 +488,11 @@ async function validateListeMere() {
     // Nettoyer complètement l'état de l'automatisation
     await clearValidationState();
     isValidationRunning = false;
+    
+    // Supprimer le panneau de progression
+    setTimeout(() => {
+        removeProgressPanel();
+    }, 2000); // Laisser 2 secondes pour voir le succès
     
     console.log('[ValidationAuto] 🧹 État de l\'automatisation complètement nettoyé');
 }
@@ -470,6 +560,187 @@ function simulateRobustClick(element) {
         console.error('[ValidationAuto] ❌ Erreur lors de la simulation de clic:', error);
         return false;
     }
+}
+
+// Fonction pour créer l'encart de progression de façon persistante
+async function createProgressPanel(optionsToValidate) {
+    // Supprimer l'ancien panneau s'il existe
+    removeProgressPanel();
+    
+    progressPanel = document.createElement('div');
+    progressPanel.id = 'validationProgressPanel';
+    progressPanel.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        font-family: Arial, sans-serif;
+        z-index: 10001;
+        min-width: 450px;
+        max-width: 500px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `;
+    
+    const title = document.createElement('div');
+    title.style.cssText = `
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    `;
+    title.innerHTML = `
+        <span>🔄 Validation automatique</span>
+        <span style="font-size: 12px; opacity: 0.7;">Échap pour arrêter</span>
+    `;
+    
+    const optionsList = document.createElement('div');
+    optionsList.id = 'validationOptionsList';
+    
+    // Ajouter la liste principale en premier
+    const mainListItem = document.createElement('div');
+    mainListItem.id = 'progress-main-list';
+    mainListItem.style.cssText = `
+        display: flex;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+        margin-bottom: 10px;
+        font-weight: bold;
+    `;
+    
+    mainListItem.innerHTML = `
+        <span id="check-main-list" style="margin-right: 10px; font-size: 16px;">⏳</span>
+        <span style="flex-grow: 1; font-size: 14px;">Liste principale</span>
+    `;
+    
+    optionsList.appendChild(mainListItem);
+    
+    // Récupérer la liste des options déjà validées
+    const state = await getValidationState();
+    const validatedOptions = state[STORAGE_KEYS.VALIDATED_OPTIONS] || [];
+    const currentOptionBeingValidated = state[STORAGE_KEYS.OPTION_BEING_VALIDATED];
+    
+    // Créer la liste des options
+    optionsToValidate.forEach((option, index) => {
+        const optionItem = document.createElement('div');
+        optionItem.id = `progress-option-${option.id}`;
+        optionItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-left: 20px;
+        `;
+        
+        // Déterminer l'état initial de l'option
+        let initialStatus = '⏳';
+        if (validatedOptions.includes(option.id)) {
+            initialStatus = '✅';
+        } else if (currentOptionBeingValidated === option.id) {
+            initialStatus = '🔄';
+        }
+        
+        optionItem.innerHTML = `
+            <span id="check-${option.id}" style="margin-right: 10px; font-size: 16px;">${initialStatus}</span>
+            <span style="flex-grow: 1; font-size: 14px;">${option.name}</span>
+        `;
+        
+        optionsList.appendChild(optionItem);
+    });
+    
+    progressPanel.appendChild(title);
+    progressPanel.appendChild(optionsList);
+    document.body.appendChild(progressPanel);
+    
+    console.log('[ValidationAuto] Panneau de progression créé avec', optionsToValidate.length, 'options');
+    console.log('[ValidationAuto] Options déjà validées:', validatedOptions);
+}
+
+// Fonction pour mettre à jour le statut d'une option dans le panneau
+function updateProgressPanel(optionId, status) {
+    if (!progressPanel) return;
+    
+    const checkElement = document.getElementById(`check-${optionId}`);
+    if (checkElement) {
+        switch (status) {
+            case 'validating':
+                checkElement.textContent = '🔄';
+                checkElement.style.color = '#2196F3';
+                break;
+            case 'completed':
+                checkElement.textContent = '✅';
+                checkElement.style.color = '#4CAF50';
+                break;
+            case 'error':
+                checkElement.textContent = '❌';
+                checkElement.style.color = '#F44336';
+                break;
+        }
+    }
+}
+
+// Fonction pour mettre à jour le statut de la liste principale
+function updateMainListProgress(status) {
+    if (!progressPanel) return;
+    
+    const checkElement = document.getElementById('check-main-list');
+    if (checkElement) {
+        switch (status) {
+            case 'validating':
+                checkElement.textContent = '🔄';
+                checkElement.style.color = '#2196F3';
+                break;
+            case 'completed':
+                checkElement.textContent = '✅';
+                checkElement.style.color = '#4CAF50';
+                break;
+            case 'error':
+                checkElement.textContent = '❌';
+                checkElement.style.color = '#F44336';
+                break;
+        }
+    }
+}
+
+// Fonction pour supprimer l'encart de progression
+function removeProgressPanel() {
+    if (progressPanel && progressPanel.parentNode) {
+        progressPanel.parentNode.removeChild(progressPanel);
+        progressPanel = null;
+        console.log('[ValidationAuto] Panneau de progression supprimé');
+    }
+}
+
+// Fonction pour gérer la touche Échap
+function handleEscapeKey(event) {
+    if (event.key === 'Escape' && isValidationRunning) {
+        console.log('[ValidationAuto] 🛑 Arrêt de la validation automatique demandé par l\'utilisateur');
+        stopValidationAutomatique();
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}
+
+// Fonction pour arrêter la validation automatique
+async function stopValidationAutomatique() {
+    console.log('[ValidationAuto] 🛑 Arrêt de la validation automatique...');
+    
+    // Nettoyer l'état
+    await clearValidationState();
+    isValidationRunning = false;
+    
+    // Supprimer le panneau de progression
+    removeProgressPanel();
+    
+    // Afficher une notification
+    showNotification('🛑 Validation automatique arrêtée par l\'utilisateur', 'warning');
+    
+    console.log('[ValidationAuto] ✅ Validation automatique arrêtée');
 }
 
 // Fonction pour afficher des notifications
@@ -553,6 +824,21 @@ async function continueAutomationIfRunning() {
     console.log('[ValidationAuto] 🔄 Automatisation valide détectée, continuité...');
     const currentStep = state[STORAGE_KEYS.CURRENT_STEP];
     
+    // Recréer le panneau de progression si nécessaire
+    if (currentStep === 'validating_options' && !progressPanel) {
+        const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+        if (optionsList.length > 0) {
+            await createProgressPanel(optionsList);
+        }
+    } else if (currentStep === 'validating_main_list' && !progressPanel) {
+        // Aussi recréer le panneau lors de la validation de la liste principale
+        const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+        if (optionsList.length > 0) {
+            await createProgressPanel(optionsList);
+            updateMainListProgress('validating');
+        }
+    }
+    
     if (currentStep === 'validating_options') {
         if (isOptionPage()) {
             // Vérifier si cette option a déjà été validée
@@ -632,6 +918,16 @@ async function initValidationAuto() {
     // Nettoyer l'état si on arrive sur une nouvelle liste mère
     await cleanStateIfNewListeMere();
     
+    // Vérifier immédiatement si une automatisation est en cours pour recréer le panneau rapidement
+    const state = await getValidationState();
+    if (state[STORAGE_KEYS.VALIDATION_RUNNING]) {
+        console.log('[ValidationAuto] ⚡ Automatisation en cours détectée, création immédiate du panneau');
+        const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+        if (optionsList.length > 0) {
+            await createProgressPanel(optionsList);
+        }
+    }
+    
     // D'abord, ajouter le bouton si nous sommes sur une page de liste mère
     const isListeMere = isListeMerePage();
     console.log('[ValidationAuto] Page de liste mère détectée:', isListeMere);
@@ -668,7 +964,7 @@ async function initValidationAuto() {
         } else {
             console.log('[ValidationAuto] ✅ Aucune automatisation en cours, prêt pour utilisation manuelle');
         }
-    }, 3000); // Attendre 3 secondes pour être sûr que l'initialisation est terminée
+    }, 1500); // Réduire le délai à 1.5 secondes
 }
 
 // Observer les changements de page pour réinitialiser le module si nécessaire
@@ -678,6 +974,18 @@ new MutationObserver(() => {
     if (currentUrl !== lastUrlValidation) {
         lastUrlValidation = currentUrl;
         console.log('[ValidationAuto] 🔄 Changement de page détecté:', currentUrl);
+        
+        // Recréer immédiatement le panneau s'il y a une automatisation en cours
+        setTimeout(async () => {
+            const state = await getValidationState();
+            if (state[STORAGE_KEYS.VALIDATION_RUNNING] && !progressPanel) {
+                console.log('[ValidationAuto] ⚡ Recréation immédiate du panneau après changement de page');
+                const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+                if (optionsList.length > 0) {
+                    await createProgressPanel(optionsList);
+                }
+            }
+        }, 100); // Très rapide pour éviter le délai visible
         
         // Nouvelle page détectée, nettoyer d'abord puis vérifier automatisation
         setTimeout(async () => {
@@ -695,6 +1003,9 @@ new MutationObserver(() => {
     }
 }).observe(document, { subtree: true, childList: true });
 
+// Ajouter l'écoute de la touche Échap
+document.addEventListener('keydown', handleEscapeKey);
+
 // Initialiser le module quand le DOM est prêt
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -706,6 +1017,18 @@ if (document.readyState === 'loading') {
 
 // Aussi initialiser après que tout soit chargé
 window.addEventListener('load', () => {
+    // Recréer immédiatement le panneau si nécessaire
+    setTimeout(async () => {
+        const state = await getValidationState();
+        if (state[STORAGE_KEYS.VALIDATION_RUNNING] && !progressPanel) {
+            console.log('[ValidationAuto] ⚡ Recréation du panneau après load complet');
+            const optionsList = state[STORAGE_KEYS.OPTIONS_LIST] || [];
+            if (optionsList.length > 0) {
+                await createProgressPanel(optionsList);
+            }
+        }
+    }, 50);
+    
     setTimeout(async () => {
         console.log('[ValidationAuto] 🔄 Initialisation après chargement complet de la page');
         
