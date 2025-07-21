@@ -22,7 +22,8 @@
       "matches": ["<all_urls>"],
       "js": [
         "content/content.js",
-        "content/modules/subject-completion-tracker.js"
+        "content/modules/subject-completion-tracker.js",
+        "content/modules/validation-automatique.js"
       ]
     }
   ],
