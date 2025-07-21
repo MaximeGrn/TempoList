@@ -3,7 +3,7 @@
 
 // Configuration par défaut
 let VALIDATION_AUTO_CONFIG = {
-    enabled: true,
+    enabled: true, // Sera chargé depuis chrome.storage.local
     delayBetweenActions: 1000, // Délai entre chaque action (ms)
     validationDelay: 2000, // Délai après validation d'une option (2s)
     maxRetries: 3
@@ -28,8 +28,9 @@ const STORAGE_KEYS = {
 // Charger la configuration
 async function loadValidationAutoConfig() {
     try {
-        const result = await chrome.storage.local.get(['validationAutoEnabled']);
-        VALIDATION_AUTO_CONFIG.enabled = result.validationAutoEnabled !== false; // true par défaut
+        const result = await chrome.storage.local.get(['automaticValidationEnabled']);
+        VALIDATION_AUTO_CONFIG.enabled = result.automaticValidationEnabled !== false; // true par défaut
+        console.log('[ValidationAuto] Configuration chargée - enabled:', VALIDATION_AUTO_CONFIG.enabled);
     } catch (error) {
         console.log('[ValidationAuto] Erreur lors du chargement de la configuration:', error);
     }
@@ -154,6 +155,12 @@ function getOptionsToValidate() {
 // Fonction pour créer le bouton de validation automatique
 function createValidationAutoButton() {
     console.log('[ValidationAuto] Création du bouton de validation automatique...');
+    
+    // Vérifier si la fonctionnalité est activée
+    if (!VALIDATION_AUTO_CONFIG.enabled) {
+        console.log('[ValidationAuto] Fonctionnalité désactivée dans les paramètres, pas d\'ajout de bouton');
+        return;
+    }
     
     // Vérifier s'il y a des options rattachées à la liste mère
     if (!hasAttachedOptions()) {
@@ -1014,6 +1021,30 @@ new MutationObserver(() => {
 
 // Ajouter l'écoute de la touche Échap pour la validation automatique
 document.addEventListener('keydown', handleValidationEscapeKey);
+
+// Écouter les messages pour activer/désactiver la fonctionnalité
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'updateAutomaticValidation') {
+        VALIDATION_AUTO_CONFIG = { ...VALIDATION_AUTO_CONFIG, ...request.config };
+        console.log('[ValidationAuto] Configuration mise à jour:', VALIDATION_AUTO_CONFIG);
+        
+        if (VALIDATION_AUTO_CONFIG.enabled) {
+            // Relancer l'initialisation si on est sur une page de liste mère
+            if (isListeMerePage() && !document.querySelector('#btnValidationAuto')) {
+                createValidationAutoButton();
+            }
+        } else {
+            // Supprimer le bouton s'il existe
+            const existingButton = document.querySelector('#btnValidationAuto');
+            if (existingButton) {
+                existingButton.parentNode.remove(); // Supprimer le conteneur entier
+                console.log('[ValidationAuto] Bouton supprimé car fonctionnalité désactivée');
+            }
+        }
+        
+        sendResponse({ success: true });
+    }
+});
 
 // Initialiser le module quand le DOM est prêt
 if (document.readyState === 'loading') {

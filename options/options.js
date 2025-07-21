@@ -23,6 +23,7 @@ async function initializeOptions() {
         await loadSettings();
         await loadAttachmentExtensionsConfig();
         await loadSubjectCompletionConfig();
+    await loadAutomaticValidationConfig();
         displayTeams();
         updateTargetInput();
     } catch (error) {
@@ -53,7 +54,12 @@ function setupEventListeners() {
     
     // Extensions de pièces jointes
     document.getElementById('enableAttachmentExtensions').addEventListener('change', handleAttachmentExtensionsChange);
-document.getElementById('enableSubjectCompletion').addEventListener('change', handleSubjectCompletionChange);
+    
+    // Complétion des matières
+    document.getElementById('enableSubjectCompletion').addEventListener('change', handleSubjectCompletionChange);
+    
+    // Validation automatique
+    document.getElementById('enableAutomaticValidation').addEventListener('change', handleAutomaticValidationChange);
     
 
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
@@ -172,6 +178,7 @@ function handleAssistModeChange() {
     setSwitchEnabled('enableEncoderStats', isAssistEnabled);
     setSwitchEnabled('enableTableStats', isAssistEnabled);
     setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
+    setSwitchEnabled('enableAutomaticValidation', isAssistEnabled);
     
     // Si le mode d'assistance est désactivé, désactiver aussi les switches
     if (!isAssistEnabled) {
@@ -189,6 +196,11 @@ function handleAssistModeChange() {
             document.getElementById('enableSubjectCompletion').checked = false;
             updateSwitchAppearance('enableSubjectCompletion', false);
             chrome.storage.local.set({ subjectCompletionEnabled: false });
+        }
+        if (document.getElementById('enableAutomaticValidation').checked) {
+            document.getElementById('enableAutomaticValidation').checked = false;
+            updateSwitchAppearance('enableAutomaticValidation', false);
+            chrome.storage.local.set({ automaticValidationEnabled: false });
         }
         // Cacher l'option du tableau des stats
         document.getElementById('tableStatsOption').classList.add('hidden');
@@ -375,6 +387,49 @@ async function loadSubjectCompletionConfig() {
     }
 }
 
+// ========================================
+// GESTION DE LA VALIDATION AUTOMATIQUE
+// ========================================
+
+// Gestion de la validation automatique des listes avec options
+function handleAutomaticValidationChange() {
+    const isEnabled = document.getElementById('enableAutomaticValidation').checked;
+    const message = isEnabled ? 'Validation automatique des listes activée !' : 'Validation automatique des listes désactivée !';
+    const notificationType = isEnabled ? 'success' : 'info';
+    
+    // Sauvegarder immédiatement
+    chrome.storage.local.set({ automaticValidationEnabled: isEnabled }, () => {
+        showNotification(message, notificationType);
+        
+        // Envoyer un message aux content scripts pour mettre à jour la fonctionnalité
+        chrome.tabs.query({ url: "*://crealiste.com/*" }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateAutomaticValidation',
+                    config: { enabled: isEnabled }
+                }).catch(() => {
+                    // Ignorer les erreurs si l'onglet n'est pas prêt
+                });
+            });
+        });
+    });
+}
+
+// Charger la configuration de la validation automatique
+async function loadAutomaticValidationConfig() {
+    try {
+        const result = await chrome.storage.local.get('automaticValidationEnabled');
+        const isEnabled = result.automaticValidationEnabled !== false; // true par défaut
+        
+        const checkbox = document.getElementById('enableAutomaticValidation');
+        if (checkbox) {
+            checkbox.checked = isEnabled;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration de la validation automatique:', error);
+    }
+}
+
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
     const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats', 'enableTableStats']);
@@ -406,6 +461,7 @@ async function loadSettings() {
     setSwitchEnabled('enableEncoderStats', isAssistEnabled);
     setSwitchEnabled('enableTableStats', isAssistEnabled);
     setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
+    setSwitchEnabled('enableAutomaticValidation', isAssistEnabled);
     
     // Afficher/cacher l'option tableau selon l'activation des stats générales
     const tableStatsOption = document.getElementById('tableStatsOption');
