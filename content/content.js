@@ -1371,6 +1371,7 @@ const exclureRefsCouleur = [
     'CATANOFOBAGNOIR',
     'CLA60322C',
     'MAP870102',
+    '3211699',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];

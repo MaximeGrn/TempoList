@@ -78,8 +78,8 @@ function calculateSubjectCompletionRate() {
         return null;
     }
     
-    // Exclure les listes primaires
-    if (level.includes('primaire')) {
+    // Exclure les listes primaires et maternelles
+    if (level.includes('primaire') || level.includes('maternelle')) {
         return null;
     }
     
@@ -149,6 +149,33 @@ function createCompletionBadge(completionRate) {
     return badge;
 }
 
+// Fonction pour pré-remplir le commentaire d'erreur si le taux est faible
+function fillErrorMessageIfNeeded(completionRate) {
+    // Seulement si le taux est inférieur à 70% (étiquette rouge)
+    if (completionRate >= 70) {
+        return;
+    }
+    
+    // Trouver le textarea d'erreur
+    const messageErrorTextarea = document.getElementById('messageError');
+    if (!messageErrorTextarea) {
+        return;
+    }
+    
+    // Vérifier si le textarea est vide ou contient déjà notre message
+    const currentMessage = messageErrorTextarea.value.trim();
+    const predefinedMessage = "Est-ce que tu peux rajouter les matières pour les articles stp ;)\nMerci !";
+    
+    // Ne remplir que si le textarea est vide
+    if (currentMessage === '') {
+        messageErrorTextarea.value = predefinedMessage;
+        
+        // Déclencher l'événement 'input' pour notifier d'autres scripts potentiels
+        const inputEvent = new Event('input', { bubbles: true });
+        messageErrorTextarea.dispatchEvent(inputEvent);
+    }
+}
+
 // Fonction pour mettre à jour l'étiquette de completion
 function updateCompletionBadge() {
     // Calculer le taux de completion
@@ -187,6 +214,9 @@ function updateCompletionBadge() {
     } else {
         h2Element.appendChild(badge);
     }
+    
+    // Pré-remplir le commentaire d'erreur si nécessaire
+    fillErrorMessageIfNeeded(result.completionRate);
 }
 
 // Fonction pour surveiller les changements et recalculer automatiquement
@@ -196,7 +226,7 @@ function startSubjectCompletionMonitoring() {
     }
     
     const level = extractListLevel();
-    if (!level || level.includes('primaire')) {
+    if (!level || level.includes('primaire') || level.includes('maternelle')) {
         return;
     }
     
