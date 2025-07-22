@@ -75,6 +75,51 @@ function hasAttachedOptions() {
     return optionsContainer && optionItems.length > 0;
 }
 
+// Fonction pour vérifier l'état de complétion des matières
+async function checkSubjectCompletionStatus() {
+    try {
+        // Vérifier si l'option de complétion des matières est activée
+        const result = await chrome.storage.local.get(['subjectCompletionEnabled']);
+        const isCompletionEnabled = result.subjectCompletionEnabled !== false;
+        
+        if (!isCompletionEnabled) {
+            // Si l'option n'est pas activée, pas de vérification nécessaire
+            console.log('[ValidationAuto] Option de complétion des matières désactivée, pas de vérification');
+            return { enabled: false, isValid: true };
+        }
+        
+        // Chercher l'étiquette de complétion
+        const completionBadge = document.querySelector('.tempolist-completion-badge');
+        
+        if (!completionBadge) {
+            // Pas d'étiquette trouvée, peut-être que le calcul n'est pas encore fait
+            console.log('[ValidationAuto] Aucune étiquette de complétion trouvée');
+            return { enabled: true, isValid: true }; // On autorise par défaut
+        }
+        
+        // Vérifier la couleur de fond pour déterminer si c'est valide
+        const backgroundColor = window.getComputedStyle(completionBadge).backgroundColor;
+        
+        // Convertir les couleurs RGB en format lisible
+        const isGreen = backgroundColor.includes('40, 167, 69') || backgroundColor.includes('#28a745'); // Vert
+        const isRed = backgroundColor.includes('220, 53, 69') || backgroundColor.includes('#dc3545'); // Rouge
+        
+        console.log('[ValidationAuto] Couleur de l\'étiquette de complétion:', backgroundColor);
+        console.log('[ValidationAuto] Complétion valide (verte):', isGreen);
+        console.log('[ValidationAuto] Complétion en erreur (rouge):', isRed);
+        
+        return {
+            enabled: true,
+            isValid: isGreen || !isRed, // Valide si vert ou pas rouge
+            badgeText: completionBadge.textContent.trim()
+        };
+        
+    } catch (error) {
+        console.error('[ValidationAuto] Erreur lors de la vérification de complétion:', error);
+        return { enabled: false, isValid: true }; // En cas d'erreur, autoriser par défaut
+    }
+}
+
 // Fonction pour vérifier si nous sommes sur une page de liste mère
 function isListeMerePage() {
     const url = window.location.href;
@@ -154,7 +199,7 @@ function getOptionsToValidate() {
 }
 
 // Fonction pour créer le bouton de validation automatique
-function createValidationAutoButton() {
+async function createValidationAutoButton() {
     console.log('[ValidationAuto] Création du bouton de validation automatique...');
     
     // Vérifier si la fonctionnalité est activée
@@ -168,6 +213,10 @@ function createValidationAutoButton() {
         console.log('[ValidationAuto] Aucune option rattachée trouvée, pas d\'ajout de bouton');
         return;
     }
+    
+    // Vérifier l'état de complétion des matières
+    const completionStatus = await checkSubjectCompletionStatus();
+    console.log('[ValidationAuto] État de complétion:', completionStatus);
     
     // Chercher le conteneur des boutons
     const btnContainer = document.querySelector('.divBtnListTeacher.divBtnListTeacher2');
@@ -215,6 +264,10 @@ function createValidationAutoButton() {
     const newButton = document.createElement('a');
     newButton.id = 'btnValidationAuto';
     newButton.className = 'text-center listBtnResponsive3 btnTeacher deleteListSimilaire';
+    
+    // Déterminer si le bouton doit être désactivé
+    const isDisabled = completionStatus.enabled && !completionStatus.isValid;
+    
     newButton.style.cssText = `
         display: flex;
         flex-direction: column;
@@ -223,8 +276,10 @@ function createValidationAutoButton() {
         height: 80px;
         padding: 10px 30px;
         text-decoration: none;
-        cursor: pointer;
+        cursor: ${isDisabled ? 'not-allowed' : 'pointer'};
         min-width: 280px;
+        opacity: ${isDisabled ? '0.5' : '1'};
+        filter: ${isDisabled ? 'grayscale(1)' : 'none'};
     `;
     
     // Utiliser le SVG Bootstrap Icons cart-check
@@ -236,8 +291,18 @@ function createValidationAutoButton() {
         <span style="font-size: 14px; line-height: 1.2;">Valider Automatiquement</span>
     `;
     
-    // Ajouter l'événement click
-    newButton.addEventListener('click', handleValidationAutoClick);
+    // Ajouter l'événement click ou un message d'erreur
+    if (isDisabled) {
+        newButton.title = `Validation automatique bloquée : Taux de remplissage des matières insuffisant (${completionStatus.badgeText || 'Erreur'})`;
+        newButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showNotification('⚠️ Validation automatique bloquée : Taux de remplissage des matières insuffisant', 'warning');
+        });
+        console.log('[ValidationAuto] Bouton désactivé à cause de la complétion insuffisante');
+    } else {
+        newButton.addEventListener('click', handleValidationAutoClick);
+        console.log('[ValidationAuto] Bouton activé - complétion OK ou vérification désactivée');
+    }
     
     // Ajouter le bouton au conteneur inférieur
     bottomContainer.appendChild(newButton);
@@ -934,14 +999,14 @@ async function initValidationAuto() {
     if (isListeMere) {
         console.log('[ValidationAuto] Tentative d\'ajout du bouton...');
         // Attendre un peu que la page soit complètement chargée
-        setTimeout(() => {
-            createValidationAutoButton();
+        setTimeout(async () => {
+            await createValidationAutoButton();
         }, 1000);
         
         // Essayer plusieurs fois si le bouton n'apparaît pas
         let retryCount = 0;
         const maxRetries = 5;
-        const retryInterval = setInterval(() => {
+        const retryInterval = setInterval(async () => {
             if (document.querySelector('#btnValidationAuto') || retryCount >= maxRetries) {
                 clearInterval(retryInterval);
                 if (retryCount >= maxRetries) {
@@ -951,7 +1016,7 @@ async function initValidationAuto() {
             }
             retryCount++;
             console.log('[ValidationAuto] Nouvelle tentative d\'ajout du bouton (', retryCount, '/', maxRetries, ')');
-            createValidationAutoButton();
+            await createValidationAutoButton();
         }, 2000);
     }
     
@@ -996,7 +1061,7 @@ new MutationObserver(() => {
             
             // Ajouter le bouton si on est sur une liste mère ET qu'aucune automatisation n'est en cours
             if (!automationContinued && isListeMerePage() && !document.querySelector('#btnValidationAuto')) {
-                createValidationAutoButton();
+                await createValidationAutoButton();
             }
         }, 1500);
     }
@@ -1014,7 +1079,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (VALIDATION_AUTO_CONFIG.enabled) {
             // Relancer l'initialisation si on est sur une page de liste mère
             if (isListeMerePage() && !document.querySelector('#btnValidationAuto')) {
-                createValidationAutoButton();
+                createValidationAutoButton().catch(error => {
+                    console.error('[ValidationAuto] Erreur lors de la création du bouton:', error);
+                });
             }
         } else {
             // Supprimer le bouton s'il existe
@@ -1063,7 +1130,7 @@ window.addEventListener('load', () => {
         
         // Ajouter le bouton si nécessaire et si aucune automatisation n'est en cours
         if (!automationContinued && isListeMerePage() && !document.querySelector('#btnValidationAuto')) {
-            createValidationAutoButton();
+            await createValidationAutoButton();
         }
     }, 2000);
 });
