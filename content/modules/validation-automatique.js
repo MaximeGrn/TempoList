@@ -13,6 +13,7 @@ let VALIDATION_AUTO_CONFIG = {
 let isValidationRunning = false;
 let currentValidationProcess = null;
 let progressPanel = null;
+let isMainListValidationScheduled = false; // Protection contre les validations multiples de la liste mère
 
 // Clés de stockage pour maintenir l'état entre les pages
 const STORAGE_KEYS = {
@@ -324,6 +325,14 @@ async function proceedToNextOption() {
     if (currentOptionsToValidate.length === 0) {
         // Plus d'options à valider
         console.log('[ValidationAuto] ✅ Plus d\'options "(A Valider)" trouvées, validation de la liste mère');
+        
+        // Vérifier si la validation de la liste mère n'est pas déjà programmée
+        if (isMainListValidationScheduled) {
+            console.log('[ValidationAuto] ⚠️ Validation de la liste mère déjà programmée, abandon');
+            return;
+        }
+        
+        isMainListValidationScheduled = true;
         showNotification('Toutes les options ont été validées. Validation de la liste mère...', 'info');
         
         await saveValidationState({
@@ -496,6 +505,7 @@ async function validateListeMere() {
     // Nettoyer complètement l'état de l'automatisation
     await clearValidationState();
     isValidationRunning = false;
+    isMainListValidationScheduled = false; // Réinitialiser le flag de protection
     
     // Supprimer le panneau de progression
     setTimeout(() => {
@@ -510,62 +520,25 @@ function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Fonction pour simuler un clic robuste
+// Fonction pour simuler un clic simple (un seul clic, pas de spam)
 function simulateRobustClick(element) {
-    console.log('[ValidationAuto] 🎯 Simulation de clic robuste sur:', element);
+    console.log('[ValidationAuto] 🎯 Clic simple sur:', element);
     
     try {
-        // Méthode 1: Focus + Click
+        // Focus optionnel pour s'assurer que l'élément est prêt
         if (element.focus) {
             element.focus();
             console.log('[ValidationAuto] ✅ Focus appliqué');
         }
         
-        // Méthode 2: Click simple
+        // UN SEUL clic simple - pas de multiple events
         element.click();
-        console.log('[ValidationAuto] ✅ Click() exécuté');
-        
-        // Méthode 3: MouseDown + MouseUp
-        const mouseDownEvent = new MouseEvent('mousedown', {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-            clientX: element.getBoundingClientRect().left + element.offsetWidth / 2,
-            clientY: element.getBoundingClientRect().top + element.offsetHeight / 2
-        });
-        
-        const mouseUpEvent = new MouseEvent('mouseup', {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-            clientX: element.getBoundingClientRect().left + element.offsetWidth / 2,
-            clientY: element.getBoundingClientRect().top + element.offsetHeight / 2
-        });
-        
-        const clickEvent = new MouseEvent('click', {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-            clientX: element.getBoundingClientRect().left + element.offsetWidth / 2,
-            clientY: element.getBoundingClientRect().top + element.offsetHeight / 2
-        });
-        
-        element.dispatchEvent(mouseDownEvent);
-        element.dispatchEvent(mouseUpEvent);
-        element.dispatchEvent(clickEvent);
-        console.log('[ValidationAuto] ✅ Événements mousedown/mouseup/click dispatchés');
-        
-        // Méthode 4: Trigger change si c'est un input
-        if (element.tagName === 'INPUT') {
-            const changeEvent = new Event('change', { bubbles: true });
-            element.dispatchEvent(changeEvent);
-            console.log('[ValidationAuto] ✅ Événement change dispatché');
-        }
+        console.log('[ValidationAuto] ✅ Click() unique exécuté');
         
         return true;
         
     } catch (error) {
-        console.error('[ValidationAuto] ❌ Erreur lors de la simulation de clic:', error);
+        console.error('[ValidationAuto] ❌ Erreur lors du clic:', error);
         return false;
     }
 }
@@ -749,6 +722,7 @@ async function stopValidationAutomatique() {
     // Nettoyer l'état
     await clearValidationState();
     isValidationRunning = false;
+    isMainListValidationScheduled = false; // Réinitialiser le flag de protection
     
     // Supprimer le panneau de progression
     removeProgressPanel();
@@ -898,6 +872,14 @@ async function continueAutomationIfRunning() {
         if (isListeMerePage()) {
             // On est sur la liste mère, la valider
             console.log('[ValidationAuto] 📍 Sur la liste mère, validation finale...');
+            
+            // Vérifier si la validation de la liste mère n'est pas déjà programmée
+            if (isMainListValidationScheduled) {
+                console.log('[ValidationAuto] ⚠️ Validation de la liste mère déjà programmée, abandon');
+                return true;
+            }
+            
+            isMainListValidationScheduled = true;
             setTimeout(() => {
                 validateListeMere();
             }, 2000);
@@ -920,6 +902,7 @@ async function cleanStateIfNewListeMere() {
         console.log('[ValidationAuto] Ancienne URL:', savedListeMereUrl);
         console.log('[ValidationAuto] Nouvelle URL:', currentUrl);
         await clearValidationState();
+        isMainListValidationScheduled = false; // Réinitialiser le flag pour la nouvelle liste mère
     }
 }
 
