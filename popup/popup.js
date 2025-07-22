@@ -148,15 +148,27 @@ function updateProgressCircle() {
     if (percentage > 0) {
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, -Math.PI / 2, angle - Math.PI / 2);
-        
-        // Couleur basée sur le statut
-        const status = calculateStatus();
+
+        // Couleur basée sur le statut ou arc-en-ciel si objectif atteint
         let color = '#3498db'; // Par défaut
-        if (status === 'ahead') color = '#27ae60';
-        else if (status === 'ontime') color = '#f39c12';
-        else if (status === 'behind') color = '#e74c3c';
-        
-        ctx.strokeStyle = color;
+        const status = calculateStatus();
+        if (currentData.currentDay.count >= currentData.dailyTarget && currentData.dailyTarget > 0) {
+            // Dégradé arc-en-ciel
+            const grad = ctx.createLinearGradient(centerX - radius, centerY, centerX + radius, centerY);
+            grad.addColorStop(0, '#ff0000'); // Rouge
+            grad.addColorStop(0.17, '#ff9900'); // Orange
+            grad.addColorStop(0.33, '#ffee00'); // Jaune
+            grad.addColorStop(0.5, '#33ff00'); // Vert
+            grad.addColorStop(0.67, '#00cfff'); // Bleu clair
+            grad.addColorStop(0.83, '#3300ff'); // Bleu
+            grad.addColorStop(1, '#cc00ff'); // Violet
+            ctx.strokeStyle = grad;
+        } else {
+            if (status === 'ahead') color = '#27ae60';
+            else if (status === 'ontime') color = '#f39c12';
+            else if (status === 'behind') color = '#e74c3c';
+            ctx.strokeStyle = color;
+        }
         ctx.lineWidth = 8;
         ctx.lineCap = 'round';
         ctx.stroke();
