@@ -1049,7 +1049,7 @@ new MutationObserver(() => {
                     await createProgressPanel(optionsList);
                 }
             }
-        }, 100); // Très rapide pour éviter le délai visible
+        }, 25); // Très rapide pour éviter le délai visible
         
         // Nouvelle page détectée, nettoyer d'abord puis vérifier automatisation
         setTimeout(async () => {
