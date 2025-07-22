@@ -857,45 +857,12 @@ document.addEventListener('contextmenu', (e) => {
         }
     }
     
-    logAction(`Clic droit détecté sur: ${target.tagName}`, 'info', false);
-    logAction(`Element info: ${JSON.stringify({
-        tagName: elementInfo.tagName,
-        id: elementInfo.id,
-        className: elementInfo.className,
-        rowIndex: elementInfo.rowIndex,
-        colId: elementInfo.colId
-    })}`);
-    
     // Envoyer les informations au background script de manière sécurisée
     safeSendMessage({
         action: 'elementRightClicked',
         elementInfo: elementInfo
     });
 });
-
-// Ajouter une vérification initiale pour s'assurer que le script fonctionne
-console.log('[TempoList] Script de contenu chargé et prêt');
-console.log('[TempoList] URL actuelle:', window.location.href);
-console.log('[TempoList] Nombre de selects trouvés:', document.querySelectorAll('select').length);
-
-// Diagnostic initial
-setTimeout(() => {
-    const selects = document.querySelectorAll('select.selectSubject');
-    console.log('[TempoList] Selects de matières trouvés:', selects.length);
-    
-    if (selects.length > 0) {
-        console.log('[TempoList] Premier select trouvé:', selects[0]);
-        const row = selects[0].closest('.ag-row');
-        if (row) {
-            console.log('[TempoList] Row-index du premier select:', row.getAttribute('row-index'));
-        }
-    }
-    
-    // Vérifier si le clic droit fonctionne
-    document.addEventListener('contextmenu', () => {
-        console.log('[TempoList] Clic droit détecté !');
-    }, { once: true });
-}, 2000);
 
 // Fonction de test pour vérifier que tout fonctionne
 function testAutomation() {
@@ -922,46 +889,6 @@ function testAutomation() {
 
 // Exposer les fonctions de test pour la console
 window.tempoListTest = testAutomation;
-window.tempoListDiagnostic = function() {
-    console.log('=== DIAGNOSTIC TEMPOLIST ===');
-    console.log('Extension chargée:', typeof chrome !== 'undefined' && chrome.runtime);
-    console.log('Selects total:', document.querySelectorAll('select').length);
-    console.log('Selects matières:', document.querySelectorAll('select.selectSubject').length);
-    console.log('Lignes AG-Grid:', document.querySelectorAll('.ag-row').length);
-    
-    const allSelects = document.querySelectorAll('select.selectSubject');
-    console.log('Analyse des selects de matières:');
-    
-    allSelects.forEach((select, index) => {
-        const row = select.closest('.ag-row');
-        const rowIndex = row?.getAttribute('row-index');
-        const value = select.value.trim();
-        const status = value === '' ? '🟡 VIDE' : value === 'Commune' ? '🟢 COMMUNE' : `🔴 ${value}`;
-        
-        console.log(`  Ligne ${rowIndex}: ${status}`);
-        
-        if (index >= 10) {
-            console.log(`  ... et ${allSelects.length - 10} autres lignes`);
-            return false;
-        }
-    });
-    
-    const firstSelect = document.querySelector('select.selectSubject');
-    if (firstSelect) {
-        // Test de sélection
-        const communeOption = Array.from(firstSelect.options).find(opt => 
-            opt.textContent.trim().toLowerCase() === 'commune'
-        );
-        console.log('Option Commune trouvée:', communeOption ? communeOption.textContent : 'NON');
-    }
-    
-    console.log('=== FIN DIAGNOSTIC ===');
-};
-
-// Auto-diagnostic au chargement
-setTimeout(() => {
-    window.tempoListDiagnostic();
-}, 3000);
 
 // === REMPLISSAGE AUTOMATIQUE PAR PATTERN ===
 
@@ -1203,8 +1130,6 @@ function rotateImage(srcUrl) {
     
     // Appliquer la rotation avec une transformation CSS
     applyImageRotation(targetImage, currentRotation);
-    
-    console.log(`[TempoList] Image pivotée de ${currentRotation} degrés`);
 }
 
 // Fonction pour appliquer la rotation à une image
@@ -1264,8 +1189,6 @@ function applyImageRotation(img, rotation) {
     // Ajouter une classe pour identifier les images pivotées
     img.classList.add('tempolist-rotated');
     img.dataset.rotation = rotation;
-    
-    console.log(`[TempoList] Image dimensions ajustées pour rotation ${rotation}°`);
 }
 
 // Nettoyer les rotations quand on quitte la page (optionnel)
