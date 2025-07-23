@@ -1296,6 +1296,7 @@ const exclureRefsCouleur = [
     'MAP870102',
     '3211699',
     'DES02-0006',
+    'JPC791152',
 
     // Ajoute ici d'autres références à exclure pour la couleur
 ];

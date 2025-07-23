@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TempoList",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Extension pour suivre l'avancement du remplissage de listes de fournitures scolaires",
   "permissions": [
     "storage",
@@ -23,7 +23,8 @@
       "js": [
         "content/content.js",
         "content/modules/subject-completion-tracker.js",
-        "content/modules/validation-automatique.js"
+        "content/modules/validation-automatique.js",
+        "content/modules/commentaire-erreur-AI.js"
       ]
     }
   ],

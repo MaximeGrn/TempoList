@@ -23,7 +23,8 @@ async function initializeOptions() {
         await loadSettings();
         await loadAttachmentExtensionsConfig();
         await loadSubjectCompletionConfig();
-    await loadAutomaticValidationConfig();
+        await loadAutomaticValidationConfig();
+        await loadAiErrorCommentConfig();
         displayTeams();
         updateTargetInput();
     } catch (error) {
@@ -61,6 +62,8 @@ function setupEventListeners() {
     // Validation automatique
     document.getElementById('enableAutomaticValidation').addEventListener('change', handleAutomaticValidationChange);
     
+    // Commentaire IA
+    document.getElementById('enableAiErrorComment').addEventListener('change', handleAiErrorCommentChange);
 
     document.getElementById('viewDataBtn').addEventListener('click', openDataViewer);
     document.getElementById('dateFilterBtn').addEventListener('click', openDatePicker);
@@ -179,6 +182,7 @@ function handleAssistModeChange() {
     setSwitchEnabled('enableTableStats', isAssistEnabled);
     setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
     setSwitchEnabled('enableAutomaticValidation', isAssistEnabled);
+    setSwitchEnabled('enableAiErrorComment', isAssistEnabled);
     
     // Si le mode d'assistance est désactivé, désactiver aussi les switches
     if (!isAssistEnabled) {
@@ -201,6 +205,11 @@ function handleAssistModeChange() {
             document.getElementById('enableAutomaticValidation').checked = false;
             updateSwitchAppearance('enableAutomaticValidation', false);
             chrome.storage.local.set({ automaticValidationEnabled: false });
+        }
+        if (document.getElementById('enableAiErrorComment').checked) {
+            document.getElementById('enableAiErrorComment').checked = false;
+            updateSwitchAppearance('enableAiErrorComment', false);
+            chrome.storage.local.set({ aiErrorCommentEnabled: false });
         }
         // Cacher l'option du tableau des stats
         document.getElementById('tableStatsOption').classList.add('hidden');
@@ -430,6 +439,49 @@ async function loadAutomaticValidationConfig() {
     }
 }
 
+// ========================================
+// GESTION DU COMMENTAIRE POUR LISTES IA
+// ========================================
+
+// Gestion du commentaire automatique pour les listes IA
+function handleAiErrorCommentChange() {
+    const isEnabled = document.getElementById('enableAiErrorComment').checked;
+    const message = isEnabled ? 'Commentaire automatique pour listes IA activé !' : 'Commentaire automatique pour listes IA désactivé !';
+    const notificationType = isEnabled ? 'success' : 'info';
+
+    // Sauvegarder immédiatement
+    chrome.storage.local.set({ aiErrorCommentEnabled: isEnabled }, () => {
+        showNotification(message, notificationType);
+
+        // Envoyer un message aux content scripts pour mettre à jour la fonctionnalité
+        chrome.tabs.query({ url: "*://crealiste.com/*" }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateAiErrorComment',
+                    config: { enabled: isEnabled }
+                }).catch(() => {
+                    // Ignorer les erreurs si l'onglet n'est pas prêt
+                });
+            });
+        });
+    });
+}
+
+// Charger la configuration du commentaire pour listes IA
+async function loadAiErrorCommentConfig() {
+    try {
+        const result = await chrome.storage.local.get('aiErrorCommentEnabled');
+        const isEnabled = result.aiErrorCommentEnabled !== false; // true par défaut
+
+        const checkbox = document.getElementById('enableAiErrorComment');
+        if (checkbox) {
+            checkbox.checked = isEnabled;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement de la configuration du commentaire IA:', error);
+    }
+}
+
 // Charger les paramètres depuis le stockage
 async function loadSettings() {
     const result = await chrome.storage.local.get(['teams', 'dailyTarget', 'assistMode', 'enableEncoderStats', 'enableTableStats']);
@@ -462,6 +514,7 @@ async function loadSettings() {
     setSwitchEnabled('enableTableStats', isAssistEnabled);
     setSwitchEnabled('enableSubjectCompletion', isAssistEnabled);
     setSwitchEnabled('enableAutomaticValidation', isAssistEnabled);
+    setSwitchEnabled('enableAiErrorComment', isAssistEnabled);
     
     // Afficher/cacher l'option tableau selon l'activation des stats générales
     const tableStatsOption = document.getElementById('tableStatsOption');
